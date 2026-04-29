@@ -171,11 +171,12 @@ export function ClientDashboard() {
             className="space-y-8"
           >
             {/* KPI Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <ClientKPICard label="Faturamento" value={lastEntry?.revenue || 0} isCurrency trend={metrics && previousMetrics ? ((metrics.roas / previousMetrics.roas - 1) * 100) : 0} />
               <ClientKPICard label="Investimento" value={lastEntry?.investment || 0} isCurrency />
+              <ClientKPICard label="Lucro" value={lastEntry?.profit || 0} isCurrency color="text-accent-mint" />
+              <ClientKPICard label="CAC" value={metrics?.cac || 0} isCurrency color="text-accent-coral" />
               <ClientKPICard label="ROAS" value={metrics?.roas || 0} isDecimal />
-              <ClientKPICard label="Meta SMART" value={client.smartGoal.targetRevenue} isCurrency suffix={`/ ${client.smartGoal.durationMonths}m`} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -499,12 +500,12 @@ export function ClientDashboard() {
   );
 }
 
-function ClientKPICard({ label, value, isCurrency, isDecimal, trend, suffix }: any) {
+function ClientKPICard({ label, value, isCurrency, isDecimal, trend, suffix, color }: any) {
   return (
     <div className="glass p-6 rounded-2xl flex flex-col gap-2 relative overflow-hidden group">
       <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">{label}</span>
       <div className="flex items-baseline gap-1">
-        <span className="text-3xl font-medium tracking-tight">
+        <span className={cn("text-3xl font-medium tracking-tight", color)}>
            {isCurrency ? formatCurrency(value).replace('R$', '').trim() : isDecimal ? value.toFixed(2) : value}
         </span>
         {suffix && <span className="text-xs text-text-muted font-bold">{suffix}</span>}
