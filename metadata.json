@@ -1,0 +1,11 @@
+{
+  "name": "Ômega Assessoria Gestor",
+  "description": "Plataforma premium para gestão de tráfego pago com relatórios automáticos e acompanhamento de métricas em tempo real para gestores brasileiros.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "Dashboard com Gráficos Recharts",
+    "Gestão de Múltiplos Tipos de Negócio",
+    "Cálculo Automático de ROAS, CAC e Funis",
+    "Exportação de Relatórios e Modo Apresentação"
+  ]
+}
