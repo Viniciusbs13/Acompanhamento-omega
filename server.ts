@@ -39,8 +39,10 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server listening on port ${PORT} (0.0.0.0)`);
   });
 }
 
-startServer();
+startServer().catch(err => {
+  console.error("Critical error starting server:", err);
+});

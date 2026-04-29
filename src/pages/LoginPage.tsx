@@ -20,9 +20,11 @@ export function LoginPage() {
     try {
       await signInWithGoogle();
       toast.success('Bem-vindo ao Ômega!');
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error('Erro ao fazer login com Google');
+      const errorMessage = error.message || 'Erro desconhecido';
+      const errorCode = error.code || 'sem-codigo';
+      toast.error(`Erro ao fazer login (${errorCode}): ${errorMessage}`);
     }
   };
 
