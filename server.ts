@@ -33,26 +33,26 @@ async function startServer() {
 
     // Fallback for SPA routing in development (must be AFTER vite.middlewares)
     app.get('*', async (req, res, next) => {
-      const url = req.originalUrl;
-      
-      // Ignore static assets and API calls
-      if (url.includes('.') || url.startsWith('/api')) {
+      // Allow API and static files with extensions to pass through
+      if (req.originalUrl.startsWith('/api') || req.originalUrl.includes('.')) {
         return next();
       }
 
-      console.log(`[Dev Server] SPA Fallback triggered for: ${url}`);
       try {
+        const url = req.originalUrl;
         const indexPath = path.resolve(process.cwd(), 'index.html');
+        
         if (!fs.existsSync(indexPath)) {
-          console.error(`[Dev Server] index.html not found at ${indexPath}`);
           return next();
         }
+
         let template = fs.readFileSync(indexPath, 'utf-8');
+        // Transform index.html using Vite's pipeline (injects HMR, etc.)
         template = await vite.transformIndexHtml(url, template);
+        
         res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
       } catch (e) {
-        console.error(`[Dev Server] Error in SPA Fallback:`, e);
-        // vite.ssrFixStacktrace(e as Error); // This can be risky if vite is not properly typed here
+        console.error(`[Dev Server] SPA Fallback Error:`, e);
         next(e);
       }
     });
