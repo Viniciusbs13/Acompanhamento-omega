@@ -30,8 +30,8 @@ async function startServer() {
     });
     app.use(vite.middlewares);
 
-    // Fallback for SPA routing in development
-    app.use('*', async (req, res, next) => {
+    // Fallback for SPA routing in development (must be AFTER vite.middlewares)
+    app.get('*', async (req, res, next) => {
       const url = req.originalUrl;
       try {
         const fs = await import('fs');
