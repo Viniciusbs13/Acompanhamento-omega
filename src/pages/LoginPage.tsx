@@ -22,9 +22,13 @@ export function LoginPage() {
       toast.success('Bem-vindo ao Ômega!');
     } catch (error: any) {
       console.error(error);
-      const errorMessage = error.message || 'Erro desconhecido';
-      const errorCode = error.code || 'sem-codigo';
-      toast.error(`Erro ao fazer login (${errorCode}): ${errorMessage}`);
+      if (error.code === 'auth/unauthorized-domain') {
+        toast.error('Domínio não autorizado. Verifique as configurações no Firebase Console.');
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        toast.info('Login cancelado.');
+      } else {
+        toast.error(`Erro ao fazer login: ${error.message || 'Erro desconhecido'}`);
+      }
     }
   };
 
