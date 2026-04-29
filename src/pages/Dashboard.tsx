@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Users, TrendingUp, DollarSign, Wallet2, Plus, ArrowRight, Activity } from 'lucide-react';
+import { Users, TrendingUp, DollarSign, Wallet2, Plus, ArrowRight, Activity, PlusCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { storage } from '../lib/storage';
 import { calculateMetrics, getHealthStatus } from '../lib/calculations';

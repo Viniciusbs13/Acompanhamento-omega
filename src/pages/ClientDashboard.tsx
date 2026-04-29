@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -22,6 +22,8 @@ export function ClientDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'entries' | 'report' | 'settings'>('overview');
   const [isPresenting, setIsPresenting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  const client = storage.getClients().find(c => c.id === id);
   
   useEffect(() => {
     const handleFsChange = () => {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Plus, Search, Filter, Briefcase, TrendingUp, AlertTriangle, CheckCircle2, MoreVertical, LayoutGrid, List } from 'lucide-react';
+import { Plus, Search, Filter, Briefcase, TrendingUp, AlertTriangle, CheckCircle2, MoreVertical, LayoutGrid, List, Users, ArrowRight } from 'lucide-react';
 import { storage } from '../lib/storage';
 import { Client, MetricEntry } from '../types';
 import { calculateMetrics, getHealthStatus } from '../lib/calculations';

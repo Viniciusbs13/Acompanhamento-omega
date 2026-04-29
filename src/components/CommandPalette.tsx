@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Users, LayoutDashboard, Plus, ChevronRight, Hash } from 'lucide-react';
@@ -146,10 +146,4 @@ export function CommandPalette() {
       </motion.div>
     </div>
   );
-}
-
-// Fixed Memo Hook
-import { useMemo as UseMemoHook } from 'react';
-function useMemo<T>(factory: () => T, deps: any[]): T {
-  return UseMemoHook(factory, deps);
 }
