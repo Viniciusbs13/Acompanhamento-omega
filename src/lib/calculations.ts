@@ -76,6 +76,10 @@ export const calculateMetrics = (entry: MetricEntry, type: BusinessType): Calcul
     }
   }
 
+  metrics.roi = invest > 0 ? ((entry.revenue || 0) - invest) / invest * 100 : 0;
+  metrics.profit = entry.profit || (entry.revenue || 0) - invest;
+  metrics.cac = entry.cac || metrics.cac; // Use manual CAC if provided
+
   return metrics;
 };
 

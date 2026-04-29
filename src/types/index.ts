@@ -44,6 +44,8 @@ export interface MetricEntry {
   shows?: number;
   sales?: number;
   revenue?: number;
+  profit?: number; // New field
+  cac?: number;    // New field for direct input if needed
 
   // Specific to ECOMMERCE
   sessions?: number;
@@ -67,6 +69,8 @@ export interface CalculatedMetrics {
   cac: number;
   ticket: number;
   conversion: number;
+  profit?: number;
+  roi?: number;
   // Specifics
   cpl?: number;
   cpc?: number;

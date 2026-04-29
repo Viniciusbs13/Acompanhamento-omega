@@ -273,65 +273,225 @@ export function ClientDashboard() {
             key="entries"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="glass rounded-3xl overflow-hidden"
+            className="space-y-6"
           >
-            <div className="p-8 border-b border-white/5 flex items-center justify-between">
-               <div>
-                 <h3 className="font-medium text-xl">Lançamentos Mensais</h3>
-                 <p className="text-sm text-text-secondary">Histórico completo de inputs e resultados.</p>
-               </div>
-               <button 
-                onClick={() => handleManualEntry(id!, client.businessType, addEntry)}
-                className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-sm font-medium flex items-center gap-2 border border-white/10 transition-all"
-               >
-                 <Plus size={16} /> Adicionar Dados
-               </button>
+            <div className="glass rounded-3xl p-8 border border-white/5">
+              <h3 className="font-medium text-xl mb-6">Novo Lançamento Mensal</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Investimento (BRL)</label>
+                  <input type="number" id="entry-investment" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Faturamento (BRL)</label>
+                  <input type="number" id="entry-revenue" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Lucro (BRL)</label>
+                  <input type="number" id="entry-profit" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">CAC (Manual opcional)</label>
+                  <input type="number" id="entry-cac" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Leads</label>
+                  <input type="number" id="entry-leads" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Agendamentos</label>
+                  <input type="number" id="entry-bookings" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Comparecimentos</label>
+                  <input type="number" id="entry-shows" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Vendas Totais</label>
+                  <input type="number" id="entry-sales" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0" />
+                </div>
+              </div>
+              <div className="mt-8 flex justify-end">
+                <button 
+                  onClick={() => {
+                    const inv = (document.getElementById('entry-investment') as HTMLInputElement).value;
+                    const rev = (document.getElementById('entry-revenue') as HTMLInputElement).value;
+                    const prof = (document.getElementById('entry-profit') as HTMLInputElement).value;
+                    const c = (document.getElementById('entry-cac') as HTMLInputElement).value;
+                    const l = (document.getElementById('entry-leads') as HTMLInputElement).value;
+                    const b = (document.getElementById('entry-bookings') as HTMLInputElement).value;
+                    const s = (document.getElementById('entry-shows') as HTMLInputElement).value;
+                    const sales = (document.getElementById('entry-sales') as HTMLInputElement).value;
+
+                    if (!inv || !rev) {
+                      toast.error("Investimento e Faturamento são obrigatórios");
+                      return;
+                    }
+
+                    const newEntry = {
+                      id: Math.random().toString(36).substr(2, 9),
+                      clientId: id!,
+                      date: new Date().toISOString(),
+                      investment: parseFloat(inv),
+                      revenue: parseFloat(rev),
+                      profit: parseFloat(prof) || 0,
+                      cac: parseFloat(c) || 0,
+                      leads: parseInt(l) || 0,
+                      bookings: parseInt(b) || 0,
+                      shows: parseInt(s) || 0,
+                      sales: parseInt(sales) || 0
+                    };
+
+                    addEntry(newEntry);
+                    toast.success("Lançamento realizado com sucesso!");
+                    // Reset fields
+                    ['investment', 'revenue', 'profit', 'cac', 'leads', 'bookings', 'shows', 'sales'].forEach(f => {
+                      (document.getElementById(`entry-${f}`) as HTMLInputElement).value = '';
+                    });
+                  }}
+                  className="bg-accent-mint text-black font-bold px-8 py-3 rounded-xl hover:bg-accent-mint/90 transition-all"
+                >
+                  Salvar Lançamento
+                </button>
+              </div>
             </div>
-            <div className="p-8 overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="text-[10px] font-bold text-text-muted uppercase tracking-widest border-b border-white/5">
-                    <th className="pb-4">Período</th>
-                    <th className="pb-4">Investimento</th>
-                    <th className="pb-4">Faturamento</th>
-                    <th className="pb-4">ROAS</th>
-                    <th className="pb-4">CAC</th>
-                    <th className="pb-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.03]">
-                  {entries.map(e => {
-                    const m = calculateMetrics(e, client.businessType);
-                    return (
+
+            <div className="glass rounded-3xl overflow-hidden">
+              <div className="p-8 border-b border-white/5">
+                <h3 className="font-medium text-xl">Histórico</h3>
+              </div>
+              <div className="p-8 overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="text-[10px] font-bold text-text-muted uppercase tracking-widest border-b border-white/5">
+                      <th className="pb-4">Período</th>
+                      <th className="pb-4">Investiment.</th>
+                      <th className="pb-4">Faturamento</th>
+                      <th className="pb-4">Lucro</th>
+                      <th className="pb-4">Leads</th>
+                      <th className="pb-4">Vendas</th>
+                      <th className="pb-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.03]">
+                    {entries.map(e => (
                       <tr key={e.id} className="group hover:bg-white/[0.02]">
                         <td className="py-5 font-medium">{new Date(e.date).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</td>
                         <td className="py-5">{formatCurrency(e.investment)}</td>
                         <td className="py-5">{formatCurrency(e.revenue || 0)}</td>
-                        <td className="py-5">
-                           <span className={cn(
-                             "px-2 py-0.5 rounded-lg text-xs font-bold",
-                             m.roas >= 4 ? "bg-accent-mint/10 text-accent-mint" : m.roas >= 2.5 ? "bg-accent-amber/10 text-accent-amber" : "bg-accent-coral/10 text-accent-coral"
-                           )}>
-                             {m.roas.toFixed(2)}
-                           </span>
-                        </td>
-                        <td className="py-5">{formatCurrency(m.cac)}</td>
+                        <td className="py-5 text-accent-mint font-medium">{formatCurrency(e.profit || 0)}</td>
+                        <td className="py-5">{e.leads || 0}</td>
+                        <td className="py-5">{e.sales || 0}</td>
                         <td className="py-5 text-right">
                           <button onClick={() => removeEntry(e.id)} className="p-2 hover:bg-accent-coral/20 hover:text-accent-coral rounded-lg opacity-0 group-hover:opacity-100 transition-all">
                              <Trash2 size={16} />
                           </button>
                         </td>
                       </tr>
-                    );
-                  })}
-                  {entries.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="py-10 text-center text-text-muted italic">Ainda não há dados lançados.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'report' && (
+          <motion.div
+            key="report"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="space-y-8"
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-6">
+                <div className="glass rounded-3xl p-8 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-medium">Análise de Performance</h3>
+                    <div className="flex items-center gap-3">
+                       <div className="flex items-center gap-2">
+                          <label className="text-[10px] font-bold text-text-muted uppercase">De:</label>
+                          <select className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs outline-none">
+                             {entries.map(e => (
+                               <option key={e.id} value={e.date}>{new Date(e.date).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}</option>
+                             ))}
+                          </select>
+                       </div>
+                       <div className="flex items-center gap-2">
+                          <label className="text-[10px] font-bold text-text-muted uppercase">Até:</label>
+                          <select className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs outline-none">
+                             {entries.map(e => (
+                               <option key={e.id} value={e.date}>{new Date(e.date).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}</option>
+                             ))}
+                          </select>
+                       </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                     <div className="bg-white/5 p-4 rounded-2xl">
+                        <p className="text-[9px] font-bold text-text-muted uppercase mb-1">Leads</p>
+                        <p className="text-xl font-medium">{entries.reduce((acc, curr) => acc + (curr.leads || 0), 0)}</p>
+                     </div>
+                     <div className="bg-white/5 p-4 rounded-2xl">
+                        <p className="text-[9px] font-bold text-text-muted uppercase mb-1">Agendam.</p>
+                        <p className="text-xl font-medium">{entries.reduce((acc, curr) => acc + (curr.bookings || 0), 0)}</p>
+                     </div>
+                     <div className="bg-white/5 p-4 rounded-2xl">
+                        <p className="text-[9px] font-bold text-text-muted uppercase mb-1">Vendas</p>
+                        <p className="text-xl font-medium">{entries.reduce((acc, curr) => acc + (curr.sales || 0), 0)}</p>
+                     </div>
+                     <div className="bg-white/5 p-4 rounded-2xl">
+                        <p className="text-[9px] font-bold text-text-muted uppercase mb-1">Lucro Total</p>
+                        <p className="text-xl font-medium text-accent-mint">{formatCurrency(entries.reduce((acc, curr) => acc + (curr.profit || 0), 0))}</p>
+                     </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Relatório Estratégico</label>
+                    <textarea 
+                      placeholder="Descreva os principais pontos positivos, gargalos e o plano de ação para o próximo período..."
+                      className="w-full min-h-[250px] bg-white/5 border border-white/10 rounded-2xl p-6 text-sm leading-relaxed resize-none focus:border-accent-mint/50 outline-none transition-all"
+                    />
+                  </div>
+
+                  <div className="pt-6 border-t border-white/5 flex justify-end gap-3">
+                    <button className="px-6 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-medium transition-all">Salvar rascunho</button>
+                    <button 
+                      onClick={() => toast.success("Relatório gerado com sucesso!")}
+                      className="px-6 py-2.5 rounded-xl bg-accent-mint text-black font-bold text-sm transition-all hover:bg-accent-mint/90 shadow-lg shadow-accent-mint/20"
+                    >
+                      Exportar Relatório
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="glass rounded-3xl p-8">
+                  <h4 className="font-medium mb-6">Métricas do Período</h4>
+                  <div className="space-y-6">
+                    <SummaryItem label="ROAS Médio" value={`${metrics?.roas.toFixed(2)}x`} />
+                    <SummaryItem label="CAC Médio" value={formatCurrency(metrics?.cac || 0)} />
+                    <SummaryItem label="ROI Médio" value={`${metrics?.roi?.toFixed(1)}%`} />
+                    <SummaryItem label="Faturamento" value={formatCurrency(entries.reduce((acc, curr) => acc + (curr.revenue || 0), 0))} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'settings' && (
+          <motion.div
+            key="settings"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="glass rounded-3xl p-12 text-center space-y-4"
+          >
+            <Settings size={48} className="mx-auto text-text-muted opacity-20" />
+            <h3 className="text-xl font-medium tracking-tight">Configurações do Cliente</h3>
+            <p className="text-text-secondary text-sm max-w-sm mx-auto">Em breve: Gerenciamento de acessos, integrações de API e limites de orçamento customizados.</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -359,17 +519,11 @@ function ClientKPICard({ label, value, isCurrency, isDecimal, trend, suffix }: a
   );
 }
 
-function HealthBadge({ status }: { status: string }) {
-  const configs = {
-    GOOD: { text: 'Em Dia', color: 'bg-accent-mint', glow: 'shadow-[0_0_10px_rgba(0,217,163,0.5)]' },
-    WARNING: { text: 'Alerta', color: 'bg-accent-amber', glow: 'shadow-[0_0_10px_rgba(255,176,32,0.5)]' },
-    CRITICAL: { text: 'Abaixo da Meta', color: 'bg-accent-coral', glow: 'shadow-[0_0_10px_rgba(255,77,77,0.5)]' },
-  }[status as 'GOOD' | 'WARNING' | 'CRITICAL'];
-
+function SummaryItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center gap-2 px-2.5 py-1 rounded-full glass border-white/5">
-       <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", configs.color, configs.glow)} />
-       <span className="text-[10px] font-bold uppercase tracking-widest leading-none mt-0.5">{configs.text}</span>
+    <div className="flex items-center justify-between">
+      <span className="text-xs text-text-muted">{label}</span>
+      <span className="text-sm font-medium">{value}</span>
     </div>
   );
 }
@@ -426,23 +580,17 @@ function ConversionFunnelVisual({ entry, type, metrics }: any) {
   );
 }
 
-function handleManualEntry(clientId: string, type: string, addEntryFn: any) {
-  // Mock form logic for the purpose of the demo
-  const amount = window.prompt("Valor do Faturamento para Abril/2026:", "12000");
-  if (!amount) return;
+function HealthBadge({ status }: { status: string }) {
+  const configs = {
+    GOOD: { text: 'Em Dia', color: 'bg-accent-mint', glow: 'shadow-[0_0_10px_rgba(0,217,163,0.5)]' },
+    WARNING: { text: 'Alerta', color: 'bg-accent-amber', glow: 'shadow-[0_0_10px_rgba(255,176,32,0.5)]' },
+    CRITICAL: { text: 'Abaixo da Meta', color: 'bg-accent-coral', glow: 'shadow-[0_0_10px_rgba(255,77,77,0.5)]' },
+  }[status as 'GOOD' | 'WARNING' | 'CRITICAL'];
 
-  const entry = {
-    id: Math.random().toString(36).substr(2, 9),
-    clientId,
-    date: new Date(2026, 3, 1).toISOString(), // April 2026
-    investment: 2500,
-    revenue: parseFloat(amount),
-    leads: 120,
-    bookings: 45,
-    shows: 32,
-    sales: 12,
-  };
-
-  addEntryFn(entry);
-  toast.success("Lançamento efetuado!");
+  return (
+    <div className="flex items-center gap-2 px-2.5 py-1 rounded-full glass border-white/5">
+       <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", configs.color, configs.glow)} />
+       <span className="text-[10px] font-bold uppercase tracking-widest leading-none mt-0.5">{configs.text}</span>
+    </div>
+  );
 }

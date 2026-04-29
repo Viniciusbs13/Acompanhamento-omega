@@ -11,6 +11,8 @@ import { Dashboard } from './pages/Dashboard';
 import { ClientList } from './pages/ClientList';
 import { ClientNew } from './pages/ClientNew';
 import { ClientDashboard } from './pages/ClientDashboard';
+import { Reports } from './pages/Reports';
+import { Settings } from './pages/Settings';
 
 export default function App() {
   return (
@@ -31,6 +33,8 @@ export default function App() {
           <Route path="/clientes" element={<ClientList />} />
           <Route path="/clientes/novo" element={<ClientNew />} />
           <Route path="/clientes/:id" element={<ClientDashboard />} />
+          <Route path="/relatorios" element={<Reports />} />
+          <Route path="/configuracoes" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
