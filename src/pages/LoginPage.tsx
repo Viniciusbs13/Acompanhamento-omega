@@ -23,7 +23,15 @@ export function LoginPage() {
     } catch (error: any) {
       console.error(error);
       if (error.code === 'auth/unauthorized-domain') {
-        toast.error(`Domínio não autorizado (${window.location.hostname}). Verifique as configurações no Firebase Console.`);
+        toast.error(
+          <div>
+            <p className="font-bold">Domínio não autorizado!</p>
+            <p className="text-xs mt-1">Hostname detectado: <strong>{window.location.hostname}</strong></p>
+            <p className="text-xs mt-1">Certifique-se de que este domínio exato está na lista de "Domínios Autorizados" no Firebase Console (Autenticação {'>'} Configurações).</p>
+            <p className="text-xs mt-2 text-accent-mint">Dica: Tente abrir o app em uma nova guia usando o ícone no topo.</p>
+          </div>,
+          { duration: 8000 }
+        );
       } else if (error.code === 'auth/popup-closed-by-user') {
         toast.info('Login cancelado.');
       } else {

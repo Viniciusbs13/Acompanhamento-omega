@@ -1,6 +1,7 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -33,9 +34,14 @@ async function startServer() {
     // Fallback for SPA routing in development (must be AFTER vite.middlewares)
     app.get('*', async (req, res, next) => {
       const url = req.originalUrl;
+      
+      // Ignore static assets and API calls
+      if (url.includes('.') || url.startsWith('/api')) {
+        return next();
+      }
+
       console.log(`[Dev Server] SPA Fallback triggered for: ${url}`);
       try {
-        const fs = await import('fs');
         const indexPath = path.resolve(process.cwd(), 'index.html');
         if (!fs.existsSync(indexPath)) {
           console.error(`[Dev Server] index.html not found at ${indexPath}`);
@@ -46,7 +52,7 @@ async function startServer() {
         res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
       } catch (e) {
         console.error(`[Dev Server] Error in SPA Fallback:`, e);
-        vite.ssrFixStacktrace(e as Error);
+        // vite.ssrFixStacktrace(e as Error); // This can be risky if vite is not properly typed here
         next(e);
       }
     });
