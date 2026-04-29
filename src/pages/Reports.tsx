@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   FileText, Search, ChevronRight, User, Calendar, ExternalLink, Filter,
@@ -15,10 +15,28 @@ export function Reports() {
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [reportText, setReportText] = useState('');
   const [period, setPeriod] = useState('Atual');
+  
+  const [clients, setClients] = useState<any[]>([]);
+  const [entries, setEntries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const clients = storage.getClients();
+  useEffect(() => {
+    setLoading(true);
+    storage.getClients().then(data => {
+      setClients(data);
+      setLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (selectedClientId) {
+      storage.getEntries(selectedClientId).then(setEntries);
+    } else {
+      setEntries([]);
+    }
+  }, [selectedClientId]);
+
   const selectedClient = useMemo(() => clients.find(c => c.id === selectedClientId), [clients, selectedClientId]);
-  const entries = useMemo(() => selectedClientId ? storage.getEntries(selectedClientId) : [], [selectedClientId]);
   
   const filteredClients = useMemo(() => {
     return clients.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));

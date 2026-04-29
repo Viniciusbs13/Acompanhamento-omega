@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Building2, ShoppingCart, Briefcase, MessageSquare, ChevronRight, ChevronLeft, Check, Plus, Trash2, Camera } from 'lucide-react';
@@ -12,6 +12,7 @@ import { cn } from '../lib/utils';
 
 const schema = z.object({
   name: z.string().min(2, "Nome é obrigatório"),
+  accountManager: z.string().min(2, "Nome do gestor é obrigatório"),
   brandColor: z.string().default("#00D9A3"),
   currentRevenue: z.number().min(0).default(0),
   targetRevenue: z.number().min(0).default(0),
@@ -24,12 +25,29 @@ export function ClientNew() {
   const [step, setStep] = useState(1);
   const [selectedType, setSelectedType] = useState<BusinessType>('SERVICE_BOOKING');
   const [channels, setChannels] = useState<string[]>(['Meta Ads', 'Google Ads']);
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error("O arquivo deve ter no máximo 2MB");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoBase64(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       brandColor: '#00D9A3',
+      accountManager: '',
       currentRevenue: 0,
       targetRevenue: 0,
       durationMonths: 6,
@@ -38,10 +56,12 @@ export function ClientNew() {
     }
   });
 
-  const onSubmit = (data: any) => {
+  const onSubmit = async (data: any) => {
     const newClient: Client = {
       id: Math.random().toString(36).substr(2, 9),
       name: data.name,
+      accountManager: data.accountManager,
+      logo: logoBase64 || undefined,
       brandColor: data.brandColor,
       businessType: selectedType,
       smartGoal: {
@@ -56,7 +76,7 @@ export function ClientNew() {
       createdAt: new Date().toISOString(),
     };
 
-    storage.saveClient(newClient);
+    await storage.saveClient(newClient);
     toast.success("Cliente criado com sucesso!");
     navigate(`/clientes/${newClient.id}`);
   };
@@ -101,22 +121,61 @@ export function ClientNew() {
               exit={{ opacity: 0, x: -20 }}
               className="space-y-8"
             >
-              <div className="flex items-center gap-8">
-                <div className="w-24 h-24 rounded-2xl glass flex flex-col items-center justify-center border-dashed border-white/20 text-text-muted hover:border-accent-mint hover:text-accent-mint cursor-pointer transition-all">
-                   <Camera size={24} />
-                   <span className="text-[10px] font-bold mt-2 uppercase">Logo</span>
+              <div className="flex items-start gap-8">
+                <div className="relative group">
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleLogoUpload} 
+                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    id="logo-upload"
+                  />
+                  <div className={cn(
+                    "w-28 h-28 rounded-2xl glass flex flex-col items-center justify-center border-dashed border-white/20 text-text-muted transition-all overflow-hidden",
+                    logoBase64 ? "border-accent-mint" : "hover:border-accent-mint hover:text-accent-mint"
+                  )}>
+                    {logoBase64 ? (
+                      <img src={logoBase64} alt="Logo preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <>
+                        <Camera size={24} />
+                        <span className="text-[10px] font-bold mt-2 uppercase">Logo</span>
+                      </>
+                    )}
+                  </div>
+                  {logoBase64 && (
+                    <button 
+                      type="button"
+                      onClick={() => setLogoBase64(null)}
+                      className="absolute -top-2 -right-2 bg-accent-coral text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
                 </div>
-                <div className="flex-1 space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Nome do Cliente</label>
-                    <input 
-                      {...register('name')}
-                      placeholder="Ex: Ômega Fitness"
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium"
-                    />
+                <div className="flex-1 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Nome do Cliente</label>
+                      <input 
+                        {...register('name')}
+                        placeholder="Ex: Ômega Fitness"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium"
+                      />
+                      {errors.name && <p className="text-accent-coral text-[10px] mt-1 font-bold">{errors.name.message as string}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Gestor Responsável</label>
+                      <input 
+                        {...register('accountManager')}
+                        placeholder="Nome do gestor"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium"
+                      />
+                      {errors.accountManager && <p className="text-accent-coral text-[10px] mt-1 font-bold">{errors.accountManager.message as string}</p>}
+                    </div>
                   </div>
                   <div>
-                     <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Cor da Marca</label>
+                     <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Editor Visual</label>
                      <div className="flex gap-4 items-center">
                         <input type="color" {...register('brandColor')} className="w-10 h-10 rounded-lg bg-transparent border-none cursor-pointer" />
                         <span className="text-sm text-text-secondary">Escolha a cor primária do dashboard.</span>

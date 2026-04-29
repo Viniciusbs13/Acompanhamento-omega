@@ -1,63 +1,36 @@
+import { firebaseStorage } from './firebaseStorage';
 import { Client, MetricEntry, UserSettings } from '../types';
 
-const KEYS = {
-  CLIENTS: 'omega:clients',
-  ENTRIES: (clientId: string) => `omega:entries:${clientId}`,
-  SETTINGS: 'omega:settings',
-};
-
 export const storage = {
-  getClients: (): Client[] => {
-    const data = localStorage.getItem(KEYS.CLIENTS);
-    return data ? JSON.parse(data) : [];
+  getClients: async (): Promise<Client[]> => {
+    return await firebaseStorage.getClients();
   },
   
-  saveClient: (client: Client) => {
-    const clients = storage.getClients();
-    const index = clients.findIndex(c => c.id === client.id);
-    if (index > -1) {
-      clients[index] = client;
-    } else {
-      clients.push(client);
-    }
-    localStorage.setItem(KEYS.CLIENTS, JSON.stringify(clients));
+  saveClient: async (client: Client) => {
+    await firebaseStorage.saveClient(client);
   },
 
-  deleteClient: (id: string) => {
-    const clients = storage.getClients().filter(c => c.id !== id);
-    localStorage.setItem(KEYS.CLIENTS, JSON.stringify(clients));
-    localStorage.removeItem(KEYS.ENTRIES(id));
+  deleteClient: async (id: string) => {
+    await firebaseStorage.deleteClient(id);
   },
 
-  getEntries: (clientId: string): MetricEntry[] => {
-    const data = localStorage.getItem(KEYS.ENTRIES(clientId));
-    return data ? JSON.parse(data) : [];
+  getEntries: async (clientId: string): Promise<MetricEntry[]> => {
+    return await firebaseStorage.getEntries(clientId);
   },
 
-  saveEntry: (entry: MetricEntry) => {
-    const entries = storage.getEntries(entry.clientId);
-    const index = entries.findIndex(e => e.id === entry.id);
-    if (index > -1) {
-      entries[index] = entry;
-    } else {
-      entries.push(entry);
-    }
-    // Sort by date
-    entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    localStorage.setItem(KEYS.ENTRIES(entry.clientId), JSON.stringify(entries));
+  saveEntry: async (entry: MetricEntry) => {
+    await firebaseStorage.saveEntry(entry);
   },
 
-  deleteEntry: (clientId: string, entryId: string) => {
-    const entries = storage.getEntries(clientId).filter(e => e.id !== entryId);
-    localStorage.setItem(KEYS.ENTRIES(clientId), JSON.stringify(entries));
+  deleteEntry: async (clientId: string, entryId: string) => {
+    await firebaseStorage.deleteEntry(clientId, entryId);
   },
 
-  getSettings: (): UserSettings => {
-    const data = localStorage.getItem(KEYS.SETTINGS);
-    return data ? JSON.parse(data) : { managerName: 'Gestor Ômega', theme: 'light' };
+  getSettings: async (): Promise<UserSettings> => {
+    return await firebaseStorage.getSettings();
   },
 
-  saveSettings: (settings: UserSettings) => {
-    localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
+  saveSettings: async (settings: UserSettings) => {
+    await firebaseStorage.saveSettings(settings);
   }
 };

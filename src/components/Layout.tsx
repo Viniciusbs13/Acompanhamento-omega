@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
@@ -16,14 +16,32 @@ import { cn } from '../lib/utils';
 import { storage } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import { CommandPalette } from './CommandPalette';
+import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'sonner';
 
 export function Layout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const settings = storage.getSettings();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const [settings, setSettings] = useState<any>(null);
+
+  useEffect(() => {
+    storage.getSettings().then(setSettings);
+  }, []);
 
   const handleOpenCommandPalette = () => {
     window.dispatchEvent(new CustomEvent('open-command-palette'));
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast.success('Até logo!');
+      navigate('/login');
+    } catch (error) {
+      toast.error('Erro ao sair');
+    }
   };
 
   const navItems = [
@@ -73,10 +91,15 @@ export function Layout() {
         </nav>
 
         <div className="p-4 border-t border-border-subtle">
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-text-secondary hover:bg-white/5 transition-colors group">
-            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs text-white">G</div>
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-text-secondary hover:bg-white/5 transition-colors group"
+          >
+            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs text-white overflow-hidden">
+              {user?.photoURL ? <img src={user.photoURL} alt="User" /> : user?.email?.charAt(0).toUpperCase()}
+            </div>
             <div className="flex-1 text-left">
-              <p className="text-white truncate">{settings.managerName}</p>
+              <p className="text-white truncate text-xs">{user?.displayName || settings?.managerName || 'Gestor'}</p>
               <p className="text-[10px] text-text-muted uppercase tracking-wider">Gestor Pro</p>
             </div>
             <LogOut size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />

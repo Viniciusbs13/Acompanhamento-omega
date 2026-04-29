@@ -1,20 +1,39 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Plus, Search, Filter, Briefcase, TrendingUp, AlertTriangle, CheckCircle2, MoreVertical, LayoutGrid, List, Users, ArrowRight } from 'lucide-react';
+import { Plus, Search, Filter, Briefcase, TrendingUp, AlertTriangle, CheckCircle2, MoreVertical, LayoutGrid, List, Users, ArrowRight, Trash2 } from 'lucide-react';
 import { storage } from '../lib/storage';
-import { Client, MetricEntry } from '../types';
+import { Client } from '../types';
 import { calculateMetrics, getHealthStatus } from '../lib/calculations';
 import { cn, formatCurrency } from '../lib/utils';
+import { toast } from 'sonner';
 
 export function ClientList() {
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [loading, setLoading] = useState(true);
   
+  const refreshClients = async () => {
+    setLoading(true);
+    const data = await storage.getClients();
+    setClients(data);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    setClients(storage.getClients());
+    refreshClients();
   }, []);
+
+  const handleDeleteClient = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.confirm("Tem certeza que deseja remover este cliente? Todos os dados vinculados serão apagados.")) {
+      await storage.deleteClient(id);
+      refreshClients();
+      toast.success("Cliente removido com sucesso");
+    }
+  };
 
   const filteredClients = clients.filter(c => 
     c.name.toLowerCase().includes(search.toLowerCase())
@@ -60,7 +79,11 @@ export function ClientList() {
         </button>
       </div>
 
-      {filteredClients.length === 0 ? (
+      {loading ? (
+        <div className="py-32 flex justify-center">
+          <div className="w-8 h-8 rounded-full border-t-2 border-accent-mint animate-spin" />
+        </div>
+      ) : filteredClients.length === 0 ? (
         <div className="py-32 flex flex-col items-center text-center glass rounded-3xl border-dashed">
           <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mb-6">
             <Users size={32} className="text-text-muted" />
@@ -87,9 +110,9 @@ export function ClientList() {
               transition={{ delay: i * 0.05 }}
             >
                {viewMode === 'grid' ? (
-                 <ClientGridItem client={client} />
+                 <ClientGridItem client={client} onDelete={handleDeleteClient} />
                ) : (
-                 <ClientListItem client={client} />
+                 <ClientListItem client={client} onDelete={handleDeleteClient} />
                )}
             </motion.div>
           ))}
@@ -99,8 +122,13 @@ export function ClientList() {
   );
 }
 
-function ClientGridItem({ client }: { client: Client }) {
-  const entries = storage.getEntries(client.id);
+function ClientGridItem({ client, onDelete }: { client: Client; onDelete: (id: string, e: React.MouseEvent) => void }) {
+  const [entries, setEntries] = useState<any[]>([]);
+
+  useEffect(() => {
+    storage.getEntries(client.id).then(setEntries);
+  }, [client.id]);
+
   const last = entries[entries.length - 1];
   const metrics = last ? calculateMetrics(last, client.businessType) : null;
   const health = metrics ? getHealthStatus(metrics, 4) : 'GOOD';
@@ -112,18 +140,36 @@ function ClientGridItem({ client }: { client: Client }) {
     >
       <div className="flex items-start justify-between mb-8">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-black font-bold text-xl" style={{ backgroundColor: client.brandColor }}>
-            {client.name.charAt(0)}
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-black font-bold text-xl overflow-hidden" style={{ backgroundColor: client.brandColor }}>
+            {client.logo ? (
+              <img src={client.logo} alt={client.name} className="w-full h-full object-cover" />
+            ) : (
+              client.name.charAt(0)
+            )}
           </div>
           <div>
             <h3 className="font-medium text-lg leading-none mb-1 group-hover:text-accent-mint transition-colors">{client.name}</h3>
-            <span className="text-[10px] text-text-muted font-bold uppercase tracking-widest">{client.businessType}</span>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-text-muted font-bold uppercase tracking-widest">{client.businessType}</span>
+              {client.accountManager && (
+                <span className="text-[9px] text-accent-mint/70 font-medium">Gestor: {client.accountManager}</span>
+              )}
+            </div>
           </div>
         </div>
-        <div className={cn(
-           "w-2 h-2 rounded-full",
-           health === 'GOOD' ? "bg-accent-mint shadow-[0_0_10px_#00D9A3]" : health === 'WARNING' ? "bg-accent-amber" : "bg-accent-coral shadow-[0_0_10px_#FF4D4D]"
-        )} />
+        <div className="flex flex-col items-end gap-2">
+           <div className={cn(
+              "w-2 h-2 rounded-full",
+              health === 'GOOD' ? "bg-accent-mint shadow-[0_0_10px_#00D9A3]" : health === 'WARNING' ? "bg-accent-amber" : "bg-accent-coral shadow-[0_0_10px_#FF4D4D]"
+           )} />
+           <button 
+             onClick={(e) => onDelete(client.id, e)}
+             className="p-1.5 rounded-lg hover:bg-accent-coral/20 hover:text-accent-coral text-text-muted transition-all opacity-0 group-hover:opacity-100"
+             title="Excluir Cliente"
+           >
+             <Trash2 size={14} />
+           </button>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -153,8 +199,13 @@ function ClientGridItem({ client }: { client: Client }) {
   );
 }
 
-function ClientListItem({ client }: { client: Client }) {
-  const entries = storage.getEntries(client.id);
+function ClientListItem({ client, onDelete }: { client: Client; onDelete: (id: string, e: React.MouseEvent) => void }) {
+  const [entries, setEntries] = useState<any[]>([]);
+
+  useEffect(() => {
+    storage.getEntries(client.id).then(setEntries);
+  }, [client.id]);
+
   const last = entries[entries.length - 1];
   const metrics = last ? calculateMetrics(last, client.businessType) : null;
 
@@ -163,12 +214,24 @@ function ClientListItem({ client }: { client: Client }) {
       to={`/clientes/${client.id}`}
       className="glass glass-hover px-6 py-4 rounded-xl flex items-center gap-6 group"
     >
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-black font-bold" style={{ backgroundColor: client.brandColor }}>
-        {client.name.charAt(0)}
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-black font-bold overflow-hidden shrink-0" style={{ backgroundColor: client.brandColor }}>
+        {client.logo ? (
+          <img src={client.logo} alt={client.name} className="w-full h-full object-cover" />
+        ) : (
+          client.name.charAt(0)
+        )}
       </div>
-      <div className="flex-1">
-        <h4 className="font-medium group-hover:text-accent-mint transition-colors">{client.name}</h4>
-        <p className="text-[10px] text-text-muted uppercase font-bold tracking-widest">{client.businessType}</p>
+      <div className="flex-1 min-w-0">
+        <h4 className="font-medium group-hover:text-accent-mint transition-colors truncate">{client.name}</h4>
+        <div className="flex items-center gap-2">
+          <p className="text-[10px] text-text-muted uppercase font-bold tracking-widest">{client.businessType}</p>
+          {client.accountManager && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-white/10" />
+              <p className="text-[10px] text-accent-mint/60 font-medium">Gestor: {client.accountManager}</p>
+            </>
+          )}
+        </div>
       </div>
       <div className="hidden md:block w-32">
         <p className="text-[9px] text-text-muted uppercase font-bold mb-1">ROAS</p>
@@ -178,8 +241,14 @@ function ClientListItem({ client }: { client: Client }) {
         <p className="text-[9px] text-text-muted uppercase font-bold mb-1">Faturamento</p>
         <p className="text-sm font-medium">{last ? formatCurrency(last.revenue || 0) : '--'}</p>
       </div>
-      <div className="flex items-center gap-1 text-text-muted group-hover:text-white transition-colors">
-        <ArrowRight size={16} />
+      <div className="flex items-center gap-2">
+        <button 
+          onClick={(e) => onDelete(client.id, e)}
+          className="p-2 rounded-lg hover:bg-accent-coral/20 hover:text-accent-coral text-text-muted transition-all opacity-0 group-hover:opacity-100"
+        >
+          <Trash2 size={16} />
+        </button>
+        <ArrowRight size={16} className="text-text-muted group-hover:text-white transition-colors" />
       </div>
     </Link>
   );

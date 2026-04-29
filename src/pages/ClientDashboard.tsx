@@ -23,7 +23,18 @@ export function ClientDashboard() {
   const [isPresenting, setIsPresenting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const client = storage.getClients().find(c => c.id === id);
+  const [client, setClient] = useState<any>(null);
+  const [loadingClient, setLoadingClient] = useState(true);
+  
+  useEffect(() => {
+    if (id) {
+      storage.getClients().then(clients => {
+        const found = clients.find(c => c.id === id);
+        setClient(found);
+        setLoadingClient(false);
+      });
+    }
+  }, [id]);
   
   useEffect(() => {
     const handleFsChange = () => {
@@ -43,7 +54,15 @@ export function ClientDashboard() {
       document.exitFullscreen();
     }
   };
-  const { entries, addEntry, removeEntry } = useEntries(id || '');
+  const { entries, addEntry, removeEntry, loading: loadingEntries } = useEntries(id || '');
+
+  if (loadingClient || loadingEntries) {
+    return (
+      <div className="py-32 flex justify-center">
+        <div className="w-8 h-8 rounded-full border-t-2 border-accent-mint animate-spin" />
+      </div>
+    );
+  }
 
   if (!client) {
     return (
@@ -84,8 +103,12 @@ export function ClientDashboard() {
       {isPresenting && (
         <div className="flex items-center justify-between mb-12">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-black font-bold" style={{ backgroundColor: client!.brandColor }}>
-              {client!.name.charAt(0)}
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-black font-bold overflow-hidden" style={{ backgroundColor: client!.brandColor }}>
+              {client!.logo ? (
+                <img src={client!.logo} alt={client!.name} className="w-full h-full object-cover" />
+              ) : (
+                client!.name.charAt(0)
+              )}
             </div>
             <div>
               <h2 className="text-xl font-medium">{client!.name}</h2>
@@ -107,10 +130,14 @@ export function ClientDashboard() {
         <div className="flex items-center gap-6">
           <motion.div 
             layoutId="client-logo"
-            className="w-20 h-20 rounded-2xl flex items-center justify-center text-black text-3xl font-bold shadow-[0_0_40px_-5px_rgba(0,0,0,0.5)] border-4 border-white/5"
+            className="w-20 h-20 rounded-2xl flex items-center justify-center text-black text-3xl font-bold shadow-[0_0_40px_-5px_rgba(0,0,0,0.5)] border-4 border-white/5 overflow-hidden shrink-0"
             style={{ backgroundColor: client.brandColor }}
           >
-            {client.name.charAt(0)}
+            {client.logo ? (
+              <img src={client.logo} alt={client.name} className="w-full h-full object-cover" />
+            ) : (
+              client.name.charAt(0)
+            )}
           </motion.div>
           <div className="space-y-1">
             <div className="flex items-center gap-3">
@@ -119,6 +146,9 @@ export function ClientDashboard() {
             </div>
             <div className="flex items-center gap-4 text-sm text-text-secondary">
                <span className="bg-white/5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest">{client.businessType}</span>
+               {client.accountManager && (
+                 <span className="flex items-center gap-1.5"><Users size={14} /> Gestor: {client.accountManager}</span>
+               )}
                <span className="flex items-center gap-1.5"><Clock size={14} /> Ativo há 6 meses</span>
             </div>
           </div>
@@ -278,7 +308,11 @@ export function ClientDashboard() {
           >
             <div className="glass rounded-3xl p-8 border border-white/5">
               <h3 className="font-medium text-xl mb-6">Novo Lançamento Mensal</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Data do Lançamento</label>
+                  <input type="month" id="entry-date" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" defaultValue={new Date().toISOString().substring(0, 7)} />
+                </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Investimento (BRL)</label>
                   <input type="number" id="entry-investment" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0.00" />
@@ -287,6 +321,8 @@ export function ClientDashboard() {
                   <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Faturamento (BRL)</label>
                   <input type="number" id="entry-revenue" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0.00" />
                 </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Lucro (BRL)</label>
                   <input type="number" id="entry-profit" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0.00" />
@@ -315,6 +351,7 @@ export function ClientDashboard() {
               <div className="mt-8 flex justify-end">
                 <button 
                   onClick={() => {
+                    const dateVal = (document.getElementById('entry-date') as HTMLInputElement).value;
                     const inv = (document.getElementById('entry-investment') as HTMLInputElement).value;
                     const rev = (document.getElementById('entry-revenue') as HTMLInputElement).value;
                     const prof = (document.getElementById('entry-profit') as HTMLInputElement).value;
@@ -324,15 +361,15 @@ export function ClientDashboard() {
                     const s = (document.getElementById('entry-shows') as HTMLInputElement).value;
                     const sales = (document.getElementById('entry-sales') as HTMLInputElement).value;
 
-                    if (!inv || !rev) {
-                      toast.error("Investimento e Faturamento são obrigatórios");
+                    if (!inv || !rev || !dateVal) {
+                      toast.error("Data, Investimento e Faturamento são obrigatórios");
                       return;
                     }
 
                     const newEntry = {
                       id: Math.random().toString(36).substr(2, 9),
                       clientId: id!,
-                      date: new Date().toISOString(),
+                      date: new Date(dateVal + "-01T12:00:00Z").toISOString(),
                       investment: parseFloat(inv),
                       revenue: parseFloat(rev),
                       profit: parseFloat(prof) || 0,
@@ -488,11 +525,64 @@ export function ClientDashboard() {
             key="settings"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="glass rounded-3xl p-12 text-center space-y-4"
+            className="space-y-8"
           >
-            <Settings size={48} className="mx-auto text-text-muted opacity-20" />
-            <h3 className="text-xl font-medium tracking-tight">Configurações do Cliente</h3>
-            <p className="text-text-secondary text-sm max-w-sm mx-auto">Em breve: Gerenciamento de acessos, integrações de API e limites de orçamento customizados.</p>
+            <div className="glass rounded-3xl p-8 border border-white/5 max-w-2xl mx-auto">
+              <h3 className="text-xl font-medium mb-8">Configurações do Cliente</h3>
+              
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const updatedClient = {
+                  ...client,
+                  name: formData.get('name') as string,
+                  accountManager: formData.get('accountManager') as string,
+                  brandColor: formData.get('brandColor') as string,
+                };
+                await storage.saveClient(updatedClient);
+                toast.success("Configurações atualizadas!");
+                setClient(updatedClient);
+              }} className="space-y-6">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Nome da Empresa</label>
+                  <input name="name" defaultValue={client.name} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Gestor Responsável</label>
+                  <input name="accountManager" defaultValue={client.accountManager} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Cor da Marca</label>
+                  <div className="flex items-center gap-4">
+                    <input type="color" name="brandColor" defaultValue={client.brandColor} className="w-10 h-10 rounded-lg bg-transparent border-none cursor-pointer" />
+                    <span className="text-sm text-text-secondary">Escolha a cor primária deste dashboard.</span>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-white/5 flex justify-end gap-3">
+                  <button type="submit" className="bg-accent-mint text-black font-bold px-8 py-3 rounded-xl hover:bg-accent-mint/90 transition-all">Salvar Alterações</button>
+                </div>
+              </form>
+            </div>
+
+            <div className="glass rounded-3xl p-8 border border-white/5 max-w-2xl mx-auto border-accent-coral/20">
+               <h3 className="text-lg font-medium text-accent-coral mb-2">Zona de Perigo</h3>
+               <p className="text-sm text-text-muted mb-6">Ao apagar este cliente, todos os registros e relatórios serão permanentemente removidos.</p>
+               <button 
+                 onClick={async () => {
+                   if(window.confirm("Certeza absoluta? Esta ação não pode ser desfeita.")) {
+                     await storage.deleteClient(client.id);
+                     navigate('/clientes');
+                     toast.success("Cliente removido.");
+                   }
+                 }}
+                 className="flex items-center gap-2 px-6 py-3 bg-accent-coral/10 text-accent-coral rounded-xl text-sm font-bold border border-accent-coral/20 hover:bg-accent-coral/20 transition-all"
+               >
+                  <Trash2 size={16} /> Apagar Cliente
+               </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

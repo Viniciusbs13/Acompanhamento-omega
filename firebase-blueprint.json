@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User specific settings and profile data.",
+      "type": "object",
+      "properties": {
+        "managerName": { "type": "string" },
+        "theme": { "type": "string", "enum": ["light", "dark"] }
+      },
+      "required": ["managerName", "theme"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "A client managed by the user.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "accountManager": { "type": "string" },
+        "logo": { "type": "string" },
+        "brandColor": { "type": "string" },
+        "businessType": { "type": "string", "enum": ["SERVICE_BOOKING", "ECOMMERCE", "B2B_LEADS", "WHATSAPP"] },
+        "smartGoal": { "$ref": "SmartGoal" },
+        "channels": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["name", "brandColor", "businessType", "smartGoal", "ownerId"]
+    },
+    "SmartGoal": {
+      "title": "Smart Goal",
+      "type": "object",
+      "properties": {
+        "currentRevenue": { "type": "number" },
+        "targetRevenue": { "type": "number" },
+        "durationMonths": { "type": "number" },
+        "adSpend": { "type": "number" },
+        "funnelSteps": { "type": "array" },
+        "ticket": { "type": "number" }
+      }
+    },
+    "MetricEntry": {
+      "title": "Metric Entry",
+      "description": "Monthly performance metrics for a client.",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "investment": { "type": "number" },
+        "leads": { "type": "number" },
+        "bookings": { "type": "number" },
+        "shows": { "type": "number" },
+        "sales": { "type": "number" },
+        "revenue": { "type": "number" },
+        "profit": { "type": "number" },
+        "cac": { "type": "number" },
+        "sessions": { "type": "number" },
+        "addCart": { "type": "number" },
+        "checkouts": { "type": "number" },
+        "purchases": { "type": "number" },
+        "mqls": { "type": "number" },
+        "meetings": { "type": "number" },
+        "proposals": { "type": "number" },
+        "waClicks": { "type": "number" },
+        "waConversations": { "type": "number" },
+        "qualifiedLeads": { "type": "number" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["clientId", "date", "investment", "ownerId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile and settings."
+    },
+    "/clients/{clientId}": {
+      "schema": "Client",
+      "description": "Clients collection."
+    },
+    "/clients/{clientId}/entries/{entryId}": {
+      "schema": "MetricEntry",
+      "description": "Metric entries sub-collection for each client."
+    }
+  }
+}

@@ -1,9 +1,36 @@
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Settings as SettingsIcon, User, Shield, Bell, Palette, Globe } from 'lucide-react';
 import { storage } from '../lib/storage';
+import { UserSettings } from '../types';
+import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
 
 export function Settings() {
-  const settings = storage.getSettings();
+  const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    storage.getSettings().then(data => {
+      setSettings(data);
+      setLoading(false);
+    });
+  }, []);
+
+  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const newSettings: UserSettings = {
+      managerName: formData.get('managerName') as string,
+      theme: settings?.theme || 'light'
+    };
+    await storage.saveSettings(newSettings);
+    setSettings(newSettings);
+    toast.success('Configurações salvas!');
+  };
+
+  if (loading || !settings) return null;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -24,40 +51,43 @@ export function Settings() {
         <div className="md:col-span-2 space-y-6">
           <div className="glass rounded-3xl p-8 border border-white/5 space-y-8">
              <div className="flex items-center gap-6">
-                <div className="w-20 h-20 rounded-full bg-accent-mint flex items-center justify-center text-black text-2xl font-bold">
-                  {settings.managerName.charAt(0)}
+                <div className="w-20 h-20 rounded-full bg-accent-mint flex items-center justify-center text-black text-2xl font-bold overflow-hidden">
+                  {user?.photoURL ? <img src={user.photoURL} alt="User" /> : settings.managerName.charAt(0)}
                 </div>
                 <div>
-                   <h3 className="text-lg font-medium">{settings.managerName}</h3>
-                   <p className="text-sm text-text-muted">assessoriaomega1@gmail.com</p>
+                   <h3 className="text-lg font-medium">{user?.displayName || settings.managerName}</h3>
+                   <p className="text-sm text-text-muted">{user?.email}</p>
                    <button className="mt-2 text-xs font-bold text-accent-mint uppercase tracking-widest hover:underline">Alterar foto</button>
                 </div>
              </div>
 
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8 border-t border-white/5">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Nome do Gestor</label>
-                  <input 
-                    type="text" 
-                    defaultValue={settings.managerName}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 transition-all outline-none" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Cargo / Título</label>
-                  <input 
-                    type="text" 
-                    defaultValue="Gestor Pro"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 transition-all outline-none" 
-                  />
-                </div>
-             </div>
+             <form onSubmit={handleSave} className="space-y-8 pt-8 border-t border-white/5">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Nome do Gestor</label>
+                    <input 
+                      name="managerName"
+                      type="text" 
+                      defaultValue={settings.managerName}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 transition-all outline-none" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Cargo / Título</label>
+                    <input 
+                      type="text" 
+                      defaultValue="Gestor Pro"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 transition-all outline-none" 
+                    />
+                  </div>
+               </div>
 
-             <div className="flex justify-end pt-4">
-                <button className="bg-accent-mint text-black font-bold px-8 py-3 rounded-xl hover:bg-accent-mint/90 transition-all shadow-lg shadow-accent-mint/20">
-                  Salvar Alterações
-                </button>
-             </div>
+               <div className="flex justify-end pt-4">
+                  <button type="submit" className="bg-accent-mint text-black font-bold px-8 py-3 rounded-xl hover:bg-accent-mint/90 transition-all shadow-lg shadow-accent-mint/20">
+                    Salvar Alterações
+                  </button>
+               </div>
+             </form>
           </div>
 
           <div className="glass rounded-3xl p-8 border border-white/5">

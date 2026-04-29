@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(obj) {
+      return isSignedIn() && obj.ownerId == request.auth.uid;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // User Profile
+    match /users/{userId} {
+      allow get: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId && 
+        incoming().keys().hasAll(['managerName', 'theme']) && 
+        incoming().managerName is string && incoming().managerName.size() <= 100;
+      allow update: if isSignedIn() && request.auth.uid == userId && 
+        incoming().diff(existing()).affectedKeys().hasOnly(['managerName', 'theme']) &&
+        incoming().managerName is string;
+    }
+
+    // Clients
+    match /clients/{clientId} {
+      function isValidClient(data) {
+        return data.name is string && data.name.size() <= 100 &&
+               data.businessType in ['SERVICE_BOOKING', 'ECOMMERCE', 'B2B_LEADS', 'WHATSAPP'] &&
+               data.ownerId == request.auth.uid;
+      }
+
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(clientId) && isValidClient(incoming());
+      allow update: if isSignedIn() && isOwner(existing()) && isValidClient(incoming()) &&
+                    incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() && isOwner(existing());
+
+      // Metric Entries (Sub-collection)
+      match /entries/{entryId} {
+        function isValidEntry(data) {
+          return data.clientId == clientId &&
+                 data.investment is number &&
+                 data.ownerId == request.auth.uid;
+        }
+
+        allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+        allow get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+        allow create: if isSignedIn() && isValidId(entryId) && isValidEntry(incoming());
+        allow update: if isSignedIn() && isOwner(existing()) && isValidEntry(incoming()) &&
+                      incoming().ownerId == existing().ownerId;
+        allow delete: if isSignedIn() && isOwner(existing());
+      }
+    }
+  }
+}

@@ -1,22 +1,29 @@
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { VideoPlayer } from '../components/VideoPlayer';
-import { ArrowRight, Lock } from 'lucide-react';
+import { LogIn, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
 
 export function LoginPage() {
-  const [email, setEmail] = useState('');
+  const { user, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
-      toast.error('Insira seu email para continuar');
-      return;
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
     }
-    toast.success('Bem-vindo ao Ômega!');
-    navigate('/dashboard');
+  }, [user, navigate]);
+
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithGoogle();
+      toast.success('Bem-vindo ao Ômega!');
+    } catch (error) {
+      console.error(error);
+      toast.error('Erro ao fazer login com Google');
+    }
   };
 
   return (
@@ -48,31 +55,20 @@ export function LoginPage() {
             <span className="text-accent-mint">em um só lugar.</span>
           </h1>
           <p className="text-text-secondary text-sm mb-8">
-            Entre para acessar seu dashboard premium.
+            Faça login para acessar seu backup seguro na nuvem.
           </p>
 
-          <form onSubmit={handleLogin} className="w-full space-y-4">
-            <div className="relative">
-              <input 
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-4 text-sm outline-none focus:border-accent-mint/50 focus:bg-white/10 transition-all"
-              />
-            </div>
-            <button 
-              type="submit"
-              className="w-full h-12 bg-accent-mint text-black font-semibold rounded-xl hover:bg-accent-mint/90 transition-all flex items-center justify-center gap-2 group shadow-[0_0_20px_-5px_#00D9A3]"
-            >
-              Entrar no painel
-              <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-            </button>
-          </form>
+          <button 
+            onClick={handleGoogleLogin}
+            className="w-full h-12 bg-white text-black font-semibold rounded-xl hover:bg-white/90 transition-all flex items-center justify-center gap-3 group"
+          >
+            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
+            Entrar com Google
+          </button>
 
-          <div className="mt-6 flex items-center gap-2 text-text-muted text-xs">
+          <div className="mt-8 flex items-center gap-2 text-text-muted text-xs">
             <Lock size={12} />
-            Acesso seguro via Ômega Auth
+            Backup 100% Sincronizado e Seguro
           </div>
         </div>
       </motion.div>

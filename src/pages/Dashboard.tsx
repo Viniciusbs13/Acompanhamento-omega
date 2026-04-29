@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Users, TrendingUp, DollarSign, Wallet2, Plus, ArrowRight, Activity, PlusCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -7,45 +7,84 @@ import { calculateMetrics, getHealthStatus } from '../lib/calculations';
 import { formatCurrency, cn } from '../lib/utils';
 import { ResponsiveContainer, ComposedChart, Bar, Line, Tooltip as RechartsTooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 
+interface DashboardStats {
+  totalInvested: number;
+  totalRevenue: number;
+  activeClients: number;
+  averageRoas: number;
+  globalChartData: any[];
+  clientEntries: Record<string, any[]>;
+}
+
 export function Dashboard() {
-  const clients = storage.getClients();
-  
-  const stats = useMemo(() => {
-    let totalInvested = 0;
-    let totalRevenue = 0;
-    let activeClients = clients.length;
+  const [clients, setClients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalInvested: 0,
+    totalRevenue: 0,
+    activeClients: 0,
+    averageRoas: 0,
+    globalChartData: [],
+    clientEntries: {}
+  });
 
-    clients.forEach(client => {
-      const entries = storage.getEntries(client.id);
-      if (entries.length > 0) {
-        const last = entries[entries.length - 1];
-        totalInvested += last.investment || 0;
-        totalRevenue += last.revenue || 0;
-      }
-    });
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      const allClients = await storage.getClients();
+      setClients(allClients);
 
-    const averageRoas = totalInvested > 0 ? totalRevenue / totalInvested : 0;
+      const entriesMap: Record<string, any[]> = {};
+      let totalInvested = 0;
+      let totalRevenue = 0;
+      const dateMap = new Map<string, { investment: number; revenue: number }>();
 
-    return { totalInvested, totalRevenue, activeClients, averageRoas };
-  }, [clients]);
+      await Promise.all(allClients.map(async (client) => {
+        const entries = await storage.getEntries(client.id);
+        entriesMap[client.id] = entries;
+        
+        if (entries.length > 0) {
+          const last = entries[entries.length - 1];
+          totalInvested += last.investment || 0;
+          totalRevenue += last.revenue || 0;
+        }
 
-  const globalChartData = useMemo(() => {
-    const dateMap = new Map<string, { investment: number; revenue: number }>();
-    
-    clients.forEach(client => {
-      const entries = storage.getEntries(client.id);
-      entries.forEach(entry => {
-        const dateKey = new Date(entry.date).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-        const current = dateMap.get(dateKey) || { investment: 0, revenue: 0 };
-        dateMap.set(dateKey, {
-          investment: current.investment + entry.investment,
-          revenue: current.revenue + (entry.revenue || 0)
+        entries.forEach(entry => {
+          const dateKey = new Date(entry.date).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+          const current = dateMap.get(dateKey) || { investment: 0, revenue: 0 };
+          dateMap.set(dateKey, {
+            investment: current.investment + entry.investment,
+            revenue: current.revenue + (entry.revenue || 0)
+          });
         });
-      });
-    });
+      }));
 
-    return Array.from(dateMap.entries()).map(([name, data]) => ({ name, ...data }));
-  }, [clients]);
+      const averageRoas = totalInvested > 0 ? totalRevenue / totalInvested : 0;
+      const globalChartData = Array.from(dateMap.entries())
+        .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime()) // Simplified sort
+        .map(([name, data]) => ({ name, ...data }));
+
+      setStats({
+        totalInvested,
+        totalRevenue,
+        activeClients: allClients.length,
+        averageRoas,
+        globalChartData,
+        clientEntries: entriesMap
+      });
+      setLoading(false);
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="py-32 flex justify-center">
+        <div className="w-8 h-8 rounded-full border-t-2 border-accent-mint animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10">
@@ -69,9 +108,9 @@ export function Dashboard() {
         </div>
 
         <div className="h-[400px]">
-          {globalChartData.length > 0 ? (
+          {stats.globalChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={globalChartData}>
+              <ComposedChart data={stats.globalChartData}>
                 <defs>
                   <linearGradient id="globalRev" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#00D9A3" stopOpacity={0.2}/>
@@ -108,7 +147,7 @@ export function Dashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {clients.length > 0 ? clients.slice(0, 6).map((client, i) => (
-             <GlobalClientCard key={client.id} client={client} index={i} />
+             <GlobalClientCard key={client.id} client={client} index={i} entries={stats.clientEntries[client.id] || []} />
           )) : (
             <div className="col-span-full py-20 flex flex-col items-center justify-center glass rounded-3xl border-dashed">
               <PlusCircle size={40} className="text-text-muted mb-4 opacity-20" />
@@ -148,8 +187,7 @@ function KPICard({ label, value, isCurrency = false, variation, icon }: any) {
   );
 }
 
-function GlobalClientCard({ client, index }: any) {
-  const entries = storage.getEntries(client.id);
+function GlobalClientCard({ client, index, entries }: any) {
   const last = entries[entries.length - 1];
   const metrics = last ? calculateMetrics(last, client.businessType) : null;
 

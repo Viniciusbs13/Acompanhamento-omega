@@ -9,9 +9,14 @@ export function CommandPalette() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [clients, setClients] = useState<any[]>([]);
   const navigate = useNavigate();
 
-  const clients = storage.getClients();
+  useEffect(() => {
+    if (isOpen) {
+      storage.getClients().then(setClients);
+    }
+  }, [isOpen]);
   
   const filteredItems = useMemo(() => {
     const search = query.toLowerCase();

@@ -4,42 +4,56 @@ import { storage } from '../lib/storage';
 
 export function useClients() {
   const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = async () => {
+    const data = await storage.getClients();
+    setClients(data);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    setClients(storage.getClients());
+    refresh();
   }, []);
 
-  const addClient = (client: Client) => {
-    storage.saveClient(client);
-    setClients(storage.getClients());
+  const addClient = async (client: Client) => {
+    await storage.saveClient(client);
+    await refresh();
   };
 
-  const removeClient = (id: string) => {
-    storage.deleteClient(id);
-    setClients(storage.getClients());
+  const removeClient = async (id: string) => {
+    await storage.deleteClient(id);
+    await refresh();
   };
 
-  return { clients, addClient, removeClient };
+  return { clients, loading, addClient, removeClient, refresh };
 }
 
 export function useEntries(clientId: string) {
   const [entries, setEntries] = useState<MetricEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = async () => {
+    if (clientId) {
+      const data = await storage.getEntries(clientId);
+      setEntries(data);
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (clientId) {
-      setEntries(storage.getEntries(clientId));
-    }
+    refresh();
   }, [clientId]);
 
-  const addEntry = (entry: MetricEntry) => {
-    storage.saveEntry(entry);
-    setEntries(storage.getEntries(clientId));
+  const addEntry = async (entry: MetricEntry) => {
+    await storage.saveEntry(entry);
+    await refresh();
   };
 
-  const removeEntry = (entryId: string) => {
-    storage.deleteEntry(clientId, entryId);
-    setEntries(storage.getEntries(clientId));
+  const removeEntry = async (entryId: string) => {
+    await storage.deleteEntry(clientId, entryId);
+    await refresh();
   };
 
-  return { entries, addEntry, removeEntry };
+  return { entries, loading, addEntry, removeEntry, refresh };
 }

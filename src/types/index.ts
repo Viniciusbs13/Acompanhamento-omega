@@ -22,6 +22,7 @@ export interface SmartGoal {
 export interface Client {
   id: string;
   name: string;
+  accountManager?: string;
   logo?: string;
   brandColor: string;
   businessType: BusinessType;
