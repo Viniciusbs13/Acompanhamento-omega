@@ -104,7 +104,11 @@ export const firebaseStorage = {
     if (!auth.currentUser) return [];
     const path = `${CLIENTS_COL}/${clientId}/entries`;
     try {
-      const q = query(collection(db, path), orderBy('date', 'asc'));
+      const q = query(
+        collection(db, path), 
+        where('ownerId', '==', auth.currentUser.uid),
+        orderBy('date', 'asc')
+      );
       const snapshot = await getDocs(q);
       return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as MetricEntry));
     } catch (error) {

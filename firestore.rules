@@ -43,7 +43,9 @@ service cloud.firestore {
       function isValidClient(data) {
         return data.name is string && data.name.size() <= 100 &&
                data.businessType in ['SERVICE_BOOKING', 'ECOMMERCE', 'B2B_LEADS', 'WHATSAPP'] &&
-               data.ownerId == request.auth.uid;
+               data.ownerId == request.auth.uid &&
+               data.brandColor is string &&
+               data.smartGoal is map;
       }
 
       allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
@@ -58,6 +60,7 @@ service cloud.firestore {
         function isValidEntry(data) {
           return data.clientId == clientId &&
                  data.investment is number &&
+                 data.date is string &&
                  data.ownerId == request.auth.uid;
         }
 
