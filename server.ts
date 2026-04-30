@@ -31,43 +31,34 @@ async function startServer() {
     });
     app.use(vite.middlewares);
 
-    // Fallback for SPA routing in development (must be AFTER vite.middlewares)
+    // Fallback for SPA routing in development
     app.get('*', async (req, res, next) => {
       const url = req.originalUrl;
 
-      // Skip API routes
-      if (url.startsWith('/api')) {
+      // Skip API and static asset requests
+      if (url.startsWith('/api') || url.includes('.')) {
         return next();
       }
 
       try {
-        // For standard page requests, serve index.html
         const indexPath = path.resolve(process.cwd(), 'index.html');
-        if (!fs.existsSync(indexPath)) {
-          return next();
-        }
-
         let template = fs.readFileSync(indexPath, 'utf-8');
-        // Transform index.html using Vite's pipeline (injects HMR, etc.)
         template = await vite.transformIndexHtml(url, template);
-        
-        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+        res.status(200).set({ 'Content-Type': 'text/html' }).send(template);
       } catch (e) {
-        console.error(`[Dev Server] SPA Fallback Error:`, e);
         next(e);
       }
     });
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    // SPA Fallback: serve index.html for any unknown route
+    
+    // SPA Fallback: serve index.html for any non-file request
     app.get('*', (req, res) => {
-      const indexPath = path.join(distPath, 'index.html');
-      if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        res.status(404).send('Not Found');
+      if (req.url.startsWith('/api')) {
+        return res.status(404).json({ error: 'API route not found' });
       }
+      res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 

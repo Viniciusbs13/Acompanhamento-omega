@@ -57,6 +57,62 @@ export function ClientDashboard() {
     }
   };
   const { entries, addEntry, removeEntry, loading: loadingEntries } = useEntries(id || '');
+  const [newEntry, setNewEntry] = useState({
+    date: new Date().toISOString().substring(0, 7),
+    investment: '',
+    revenue: '',
+    profit: '',
+    cac: '',
+    leads: '',
+    bookings: '',
+    shows: '',
+    sales: ''
+  });
+
+  const handleAddField = (field: string, value: string) => {
+    setNewEntry(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveEntry = async () => {
+    if (!newEntry.investment || !newEntry.revenue || !newEntry.date) {
+      toast.error("Data, Investimento e Faturamento são obrigatórios");
+      return;
+    }
+
+    const toastId = toast.loading("Salvando lançamento...");
+    try {
+      const entryData = {
+        id: Math.random().toString(36).substring(2, 11),
+        clientId: id!,
+        date: new Date(newEntry.date + "-01T12:00:00Z").toISOString(),
+        investment: parseFloat(newEntry.investment),
+        revenue: parseFloat(newEntry.revenue),
+        profit: parseFloat(newEntry.profit) || 0,
+        cac: parseFloat(newEntry.cac) || 0,
+        leads: parseInt(newEntry.leads) || 0,
+        bookings: parseInt(newEntry.bookings) || 0,
+        shows: parseInt(newEntry.shows) || 0,
+        sales: parseInt(newEntry.sales) || 0
+      };
+
+      await addEntry(entryData);
+      setNewEntry({
+        date: new Date().toISOString().substring(0, 7),
+        investment: '',
+        revenue: '',
+        profit: '',
+        cac: '',
+        leads: '',
+        bookings: '',
+        shows: '',
+        sales: ''
+      });
+      toast.success("Lançamento realizado com sucesso!", { id: toastId });
+    } catch (error) {
+      console.error("Erro ao salvar lançamento:", error);
+      toast.error("Erro ao salvar lançamento.", { id: toastId });
+    }
+  };
 
   const lastEntry = useMemo(() => entries[entries.length - 1], [entries]);
   const metrics = useMemo(() => lastEntry ? calculateMetrics(lastEntry, client?.businessType) : null, [lastEntry, client?.businessType]);
@@ -359,83 +415,100 @@ export function ClientDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Data do Lançamento</label>
-                  <input type="month" id="entry-date" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" defaultValue={new Date().toISOString().substring(0, 7)} />
+                  <input 
+                    type="month" 
+                    value={newEntry.date}
+                    onChange={(e) => handleAddField('date', e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Investimento (BRL)</label>
-                  <input type="number" id="entry-investment" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0.00" />
+                  <input 
+                    type="number" 
+                    value={newEntry.investment}
+                    onChange={(e) => handleAddField('investment', e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
+                    placeholder="0.00" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Faturamento (BRL)</label>
-                  <input type="number" id="entry-revenue" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0.00" />
+                  <input 
+                    type="number" 
+                    value={newEntry.revenue}
+                    onChange={(e) => handleAddField('revenue', e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
+                    placeholder="0.00" 
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Lucro (BRL)</label>
-                  <input type="number" id="entry-profit" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0.00" />
+                  <input 
+                    type="number" 
+                    value={newEntry.profit}
+                    onChange={(e) => handleAddField('profit', e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
+                    placeholder="0.00" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">CAC (Manual opcional)</label>
-                  <input type="number" id="entry-cac" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0.00" />
+                  <input 
+                    type="number" 
+                    value={newEntry.cac}
+                    onChange={(e) => handleAddField('cac', e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
+                    placeholder="0.00" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Leads</label>
-                  <input type="number" id="entry-leads" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0" />
+                  <input 
+                    type="number" 
+                    value={newEntry.leads}
+                    onChange={(e) => handleAddField('leads', e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
+                    placeholder="0" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Agendamentos</label>
-                  <input type="number" id="entry-bookings" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0" />
+                  <input 
+                    type="number" 
+                    value={newEntry.bookings}
+                    onChange={(e) => handleAddField('bookings', e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
+                    placeholder="0" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Comparecimentos</label>
-                  <input type="number" id="entry-shows" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0" />
+                  <input 
+                    type="number" 
+                    value={newEntry.shows}
+                    onChange={(e) => handleAddField('shows', e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
+                    placeholder="0" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Vendas Totais</label>
-                  <input type="number" id="entry-sales" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="0" />
+                  <input 
+                    type="number" 
+                    value={newEntry.sales}
+                    onChange={(e) => handleAddField('sales', e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
+                    placeholder="0" 
+                  />
                 </div>
               </div>
               <div className="mt-8 flex justify-end">
                 <button 
-                  onClick={() => {
-                    const dateVal = (document.getElementById('entry-date') as HTMLInputElement).value;
-                    const inv = (document.getElementById('entry-investment') as HTMLInputElement).value;
-                    const rev = (document.getElementById('entry-revenue') as HTMLInputElement).value;
-                    const prof = (document.getElementById('entry-profit') as HTMLInputElement).value;
-                    const c = (document.getElementById('entry-cac') as HTMLInputElement).value;
-                    const l = (document.getElementById('entry-leads') as HTMLInputElement).value;
-                    const b = (document.getElementById('entry-bookings') as HTMLInputElement).value;
-                    const s = (document.getElementById('entry-shows') as HTMLInputElement).value;
-                    const sales = (document.getElementById('entry-sales') as HTMLInputElement).value;
-
-                    if (!inv || !rev || !dateVal) {
-                      toast.error("Data, Investimento e Faturamento são obrigatórios");
-                      return;
-                    }
-
-                    const newEntry = {
-                      id: Math.random().toString(36).substr(2, 9),
-                      clientId: id!,
-                      date: new Date(dateVal + "-01T12:00:00Z").toISOString(),
-                      investment: parseFloat(inv),
-                      revenue: parseFloat(rev),
-                      profit: parseFloat(prof) || 0,
-                      cac: parseFloat(c) || 0,
-                      leads: parseInt(l) || 0,
-                      bookings: parseInt(b) || 0,
-                      shows: parseInt(s) || 0,
-                      sales: parseInt(sales) || 0
-                    };
-
-                    addEntry(newEntry);
-                    toast.success("Lançamento realizado com sucesso!");
-                    // Reset fields
-                    ['investment', 'revenue', 'profit', 'cac', 'leads', 'bookings', 'shows', 'sales'].forEach(f => {
-                      (document.getElementById(`entry-${f}`) as HTMLInputElement).value = '';
-                    });
-                  }}
-                  className="bg-accent-mint text-black font-bold px-8 py-3 rounded-xl hover:bg-accent-mint/90 transition-all"
+                  onClick={handleSaveEntry}
+                  className="bg-accent-mint text-black font-bold px-8 py-3 rounded-xl hover:bg-accent-mint/90 transition-all shadow-lg shadow-accent-mint/20"
                 >
                   Salvar Lançamento
                 </button>

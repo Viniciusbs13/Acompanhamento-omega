@@ -15,6 +15,7 @@ import { ClientDashboard } from './pages/ClientDashboard';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -39,12 +40,12 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/clientes" element={<ClientList />} />
-            <Route path="/clientes/novo" element={<ClientNew />} />
-            <Route path="/clientes/:id" element={<ClientDashboard />} />
-            <Route path="/relatorios" element={<Reports />} />
-            <Route path="/configuracoes" element={<Settings />} />
+            <Route path="/dashboard" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
+            <Route path="/clientes" element={<ErrorBoundary><ClientList /></ErrorBoundary>} />
+            <Route path="/clientes/novo" element={<ErrorBoundary><ClientNew /></ErrorBoundary>} />
+            <Route path="/clientes/:id" element={<ErrorBoundary><ClientDashboard /></ErrorBoundary>} />
+            <Route path="/relatorios" element={<ErrorBoundary><Reports /></ErrorBoundary>} />
+            <Route path="/configuracoes" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

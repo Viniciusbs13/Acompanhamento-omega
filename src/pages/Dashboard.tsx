@@ -37,7 +37,7 @@ export function Dashboard() {
       const entriesMap: Record<string, any[]> = {};
       let totalInvested = 0;
       let totalRevenue = 0;
-      const dateMap = new Map<string, { investment: number; revenue: number }>();
+      const dateMap = new Map<string, { investment: number; revenue: number; timestamp: number }>();
 
       await Promise.all(allClients.map(async (client) => {
         const entries = await storage.getEntries(client.id);
@@ -50,45 +50,21 @@ export function Dashboard() {
         }
 
         entries.forEach(entry => {
-          const dateKey = new Date(entry.date).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-          const current = dateMap.get(dateKey) || { investment: 0, revenue: 0 };
+          const date = new Date(entry.date);
+          const dateKey = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+          const current = dateMap.get(dateKey) || { investment: 0, revenue: 0, timestamp: date.getTime() };
           dateMap.set(dateKey, {
             investment: current.investment + entry.investment,
-            revenue: current.revenue + (entry.revenue || 0)
+            revenue: current.revenue + (entry.revenue || 0),
+            timestamp: Math.min(current.timestamp, date.getTime())
           });
         });
       }));
 
       const averageRoas = totalInvested > 0 ? totalRevenue / totalInvested : 0;
       const globalChartData = Array.from(dateMap.entries())
-        .map(([name, data]) => {
-          // Parse date for sorting - pt-BR short months
-          // toLocaleDateString might return "abr. de 24" or "abr./24"
-          const months: Record<string, string> = {
-            'jan.': '01', 'fev.': '02', 'mar.': '03', 'abr.': '04', 'mai.': '05', 'jun.': '06',
-            'jul.': '07', 'ago.': '08', 'set.': '09', 'out.': '10', 'nov.': '11', 'dez.': '12'
-          };
-          
-          let monthStr = '';
-          let yearStr = '';
-          
-          if (name.includes(' de ')) {
-            const parts = name.split(' de ');
-            monthStr = parts[0];
-            yearStr = parts[1];
-          } else if (name.includes('/')) {
-            const parts = name.split('/');
-            monthStr = parts[0];
-            yearStr = parts[1];
-          } else {
-            monthStr = name.substring(0, 3).toLowerCase() + '.';
-            yearStr = name.slice(-2);
-          }
-
-          const monthNum = months[monthStr] || '01';
-          return { name, ...data, sortDate: parseInt(`20${yearStr}${monthNum}`) };
-        })
-        .sort((a, b) => a.sortDate - b.sortDate);
+        .map(([name, data]) => ({ name, ...data }))
+        .sort((a, b) => a.timestamp - b.timestamp);
 
       setStats({
         totalInvested,
