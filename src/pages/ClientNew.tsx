@@ -9,6 +9,7 @@ import { BusinessType, Client } from '../types';
 import { storage } from '../lib/storage';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
+import { compressImage } from '../lib/imageUtils';
 
 const schema = z.object({
   name: z.string().min(2, "Nome é obrigatório"),
@@ -28,16 +29,20 @@ export function ClientNew() {
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error("O arquivo deve ter no máximo 2MB");
-        return;
-      }
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoBase64(reader.result as string);
+      reader.onloadend = async () => {
+        try {
+          const base64 = reader.result as string;
+          // Redimensionar e comprimir para garantir que fique abaixo do limite do Firestore (1MB)
+          const compressed = await compressImage(base64, 400, 400);
+          setLogoBase64(compressed);
+        } catch (error) {
+          console.error('Erro ao processar imagem:', error);
+          toast.error("Erro ao processar imagem. Tente outro formato.");
+        }
       };
       reader.readAsDataURL(file);
     }
