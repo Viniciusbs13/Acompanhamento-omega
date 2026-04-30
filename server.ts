@@ -33,15 +33,16 @@ async function startServer() {
 
     // Fallback for SPA routing in development (must be AFTER vite.middlewares)
     app.get('*', async (req, res, next) => {
-      // Allow API and static files with extensions to pass through
-      if (req.originalUrl.startsWith('/api') || req.originalUrl.includes('.')) {
+      const url = req.originalUrl;
+
+      // Skip API routes
+      if (url.startsWith('/api')) {
         return next();
       }
 
       try {
-        const url = req.originalUrl;
+        // For standard page requests, serve index.html
         const indexPath = path.resolve(process.cwd(), 'index.html');
-        
         if (!fs.existsSync(indexPath)) {
           return next();
         }
@@ -61,7 +62,12 @@ async function startServer() {
     app.use(express.static(distPath));
     // SPA Fallback: serve index.html for any unknown route
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const indexPath = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send('Not Found');
+      }
     });
   }
 

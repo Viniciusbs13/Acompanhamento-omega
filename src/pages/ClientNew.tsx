@@ -56,29 +56,62 @@ export function ClientNew() {
     }
   });
 
-  const onSubmit = async (data: any) => {
-    const newClient: Client = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: data.name,
-      accountManager: data.accountManager,
-      logo: logoBase64 || undefined,
-      brandColor: data.brandColor,
-      businessType: selectedType,
-      smartGoal: {
-        currentRevenue: data.currentRevenue,
-        targetRevenue: data.targetRevenue,
-        durationMonths: data.durationMonths,
-        adSpend: data.adSpend,
-        ticket: data.ticket,
-        funnelSteps: [], // Managed by business logic later
-      },
-      channels: channels,
-      createdAt: new Date().toISOString(),
-    };
+  const onFormError = (errors: any) => {
+    console.error('Erros de validação:', errors);
+    const errorCount = Object.keys(errors).length;
+    if (errorCount > 0) {
+      toast.error(`Existem ${errorCount} campo(s) com erro. Verifique os passos anteriores.`);
+      
+      // Determine which step to go back to based on error keys
+      const errorKeys = Object.keys(errors);
+      if (errorKeys.some(key => ['name', 'accountManager'].includes(key))) {
+        setStep(1);
+      } else if (errorKeys.some(key => ['currentRevenue', 'targetRevenue', 'durationMonths', 'adSpend', 'ticket'].includes(key))) {
+        setStep(3);
+      }
+    }
+  };
 
-    await storage.saveClient(newClient);
-    toast.success("Cliente criado com sucesso!");
-    navigate(`/clientes/${newClient.id}`);
+  const onSubmit = async (data: any) => {
+    try {
+      const newClient: Client = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: data.name,
+        accountManager: data.accountManager,
+        logo: logoBase64 || null,
+        brandColor: data.brandColor,
+        businessType: selectedType,
+        smartGoal: {
+          currentRevenue: data.currentRevenue,
+          targetRevenue: data.targetRevenue,
+          durationMonths: data.durationMonths,
+          adSpend: data.adSpend,
+          ticket: data.ticket,
+          funnelSteps: [], // Managed by business logic later
+        },
+        channels: channels,
+        createdAt: new Date().toISOString(),
+      };
+
+      console.log('Tentando salvar cliente:', newClient);
+      await storage.saveClient(newClient);
+      toast.success("Cliente criado com sucesso!");
+      navigate(`/clientes/${newClient.id}`);
+    } catch (error: any) {
+      console.error('Erro ao salvar cliente:', error);
+      let errorMessage = "Erro ao criar cliente. Tente novamente.";
+      
+      if (error.message) {
+        try {
+           const parsed = JSON.parse(error.message);
+           if (parsed.error) errorMessage = `Erro no Firestore: ${parsed.error}`;
+        } catch {
+           errorMessage = error.message;
+        }
+      }
+
+      toast.error(errorMessage);
+    }
   };
 
   const businessTypes = [
@@ -111,7 +144,7 @@ export function ClientNew() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 min-h-[500px]">
+      <form onSubmit={handleSubmit(onSubmit, onFormError)} className="space-y-8 min-h-[500px]">
         <AnimatePresence mode="wait">
           {step === 1 && (
             <motion.div

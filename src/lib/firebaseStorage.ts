@@ -46,6 +46,18 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
+function cleanData(data: any) {
+  const clean = { ...data };
+  Object.keys(clean).forEach(key => {
+    if (clean[key] === undefined) {
+      delete clean[key];
+    } else if (clean[key] !== null && typeof clean[key] === 'object' && !Array.isArray(clean[key])) {
+      clean[key] = cleanData(clean[key]);
+    }
+  });
+  return clean;
+}
+
 const CLIENTS_COL = 'clients';
 const USERS_COL = 'users';
 
@@ -68,11 +80,11 @@ export const firebaseStorage = {
     if (!auth.currentUser) return;
     const path = `${CLIENTS_COL}/${client.id}`;
     try {
-      await setDoc(doc(db, CLIENTS_COL, client.id), {
+      await setDoc(doc(db, CLIENTS_COL, client.id), cleanData({
         ...client,
         ownerId: auth.currentUser.uid,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      }), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
@@ -105,10 +117,10 @@ export const firebaseStorage = {
     if (!auth.currentUser) return;
     const path = `${CLIENTS_COL}/${entry.clientId}/entries/${entry.id}`;
     try {
-      await setDoc(doc(db, CLIENTS_COL, entry.clientId, 'entries', entry.id), {
+      await setDoc(doc(db, CLIENTS_COL, entry.clientId, 'entries', entry.id), cleanData({
         ...entry,
         ownerId: auth.currentUser.uid
-      }, { merge: true });
+      }), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
@@ -143,7 +155,7 @@ export const firebaseStorage = {
     if (!auth.currentUser) return;
     const path = `${USERS_COL}/${auth.currentUser.uid}`;
     try {
-      await setDoc(doc(db, USERS_COL, auth.currentUser.uid), settings, { merge: true });
+      await setDoc(doc(db, USERS_COL, auth.currentUser.uid), cleanData(settings), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
