@@ -61,8 +61,34 @@ export function Dashboard() {
 
       const averageRoas = totalInvested > 0 ? totalRevenue / totalInvested : 0;
       const globalChartData = Array.from(dateMap.entries())
-        .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime()) // Simplified sort
-        .map(([name, data]) => ({ name, ...data }));
+        .map(([name, data]) => {
+          // Parse date for sorting - pt-BR short months
+          // toLocaleDateString might return "abr. de 24" or "abr./24"
+          const months: Record<string, string> = {
+            'jan.': '01', 'fev.': '02', 'mar.': '03', 'abr.': '04', 'mai.': '05', 'jun.': '06',
+            'jul.': '07', 'ago.': '08', 'set.': '09', 'out.': '10', 'nov.': '11', 'dez.': '12'
+          };
+          
+          let monthStr = '';
+          let yearStr = '';
+          
+          if (name.includes(' de ')) {
+            const parts = name.split(' de ');
+            monthStr = parts[0];
+            yearStr = parts[1];
+          } else if (name.includes('/')) {
+            const parts = name.split('/');
+            monthStr = parts[0];
+            yearStr = parts[1];
+          } else {
+            monthStr = name.substring(0, 3).toLowerCase() + '.';
+            yearStr = name.slice(-2);
+          }
+
+          const monthNum = months[monthStr] || '01';
+          return { name, ...data, sortDate: parseInt(`20${yearStr}${monthNum}`) };
+        })
+        .sort((a, b) => a.sortDate - b.sortDate);
 
       setStats({
         totalInvested,
@@ -107,9 +133,9 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="h-[400px]">
+        <div className="h-[400px] min-w-0 w-full overflow-hidden">
           {stats.globalChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50} key="consolidated-chart">
               <ComposedChart data={stats.globalChartData}>
                 <defs>
                   <linearGradient id="globalRev" x1="0" y1="0" x2="0" y2="1">

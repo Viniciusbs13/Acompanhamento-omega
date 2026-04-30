@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 
 export function ClientList() {
   const [clients, setClients] = useState<Client[]>([]);
+  const [allEntries, setAllEntries] = useState<Record<string, any[]>>({});
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [loading, setLoading] = useState(true);
@@ -18,6 +19,16 @@ export function ClientList() {
     setLoading(true);
     const data = await storage.getClients();
     setClients(data);
+    
+    // Fetch entries for all clients in parallel to avoid many Waterfall requests
+    const entriesMap: Record<string, any[]> = {};
+    if (data.length > 0) {
+      await Promise.all(data.map(async (client) => {
+         const ent = await storage.getEntries(client.id);
+         entriesMap[client.id] = ent;
+      }));
+    }
+    setAllEntries(entriesMap);
     setLoading(false);
   };
 
@@ -28,10 +39,17 @@ export function ClientList() {
   const handleDeleteClient = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
     if (window.confirm("Tem certeza que deseja remover este cliente? Todos os dados vinculados serão apagados.")) {
-      await storage.deleteClient(id);
-      refreshClients();
-      toast.success("Cliente removido com sucesso");
+      const toastId = toast.loading("Removendo cliente...");
+      try {
+        await storage.deleteClient(id);
+        await refreshClients();
+        toast.success("Cliente removido com sucesso", { id: toastId });
+      } catch (error: any) {
+        console.error("Erro ao deletar cliente:", error);
+        toast.error("Erro ao remover cliente. Verifique suas permissões.", { id: toastId });
+      }
     }
   };
 
@@ -110,9 +128,9 @@ export function ClientList() {
               transition={{ delay: i * 0.05 }}
             >
                {viewMode === 'grid' ? (
-                 <ClientGridItem client={client} onDelete={handleDeleteClient} />
+                 <ClientGridItem client={client} entries={allEntries[client.id] || []} onDelete={handleDeleteClient} />
                ) : (
-                 <ClientListItem client={client} onDelete={handleDeleteClient} />
+                 <ClientListItem client={client} entries={allEntries[client.id] || []} onDelete={handleDeleteClient} />
                )}
             </motion.div>
           ))}
@@ -122,134 +140,129 @@ export function ClientList() {
   );
 }
 
-function ClientGridItem({ client, onDelete }: { client: Client; onDelete: (id: string, e: React.MouseEvent) => void }) {
-  const [entries, setEntries] = useState<any[]>([]);
-
-  useEffect(() => {
-    storage.getEntries(client.id).then(setEntries);
-  }, [client.id]);
-
+function ClientGridItem({ client, entries, onDelete }: { client: Client; entries: any[]; onDelete: (id: string, e: React.MouseEvent) => void }) {
   const last = entries[entries.length - 1];
   const metrics = last ? calculateMetrics(last, client.businessType) : null;
   const health = metrics ? getHealthStatus(metrics, 4) : 'GOOD';
 
   return (
-    <Link 
-      to={`/clientes/${client.id}`}
-      className="glass glass-hover p-6 rounded-3xl block group h-full relative overflow-hidden"
-    >
-      <div className="flex items-start justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-black font-bold text-xl overflow-hidden" style={{ backgroundColor: client.brandColor }}>
-            {client.logo ? (
-              <img src={client.logo} alt={client.name} className="w-full h-full object-cover" />
-            ) : (
-              client.name.charAt(0)
-            )}
-          </div>
-          <div>
-            <h3 className="font-medium text-lg leading-none mb-1 group-hover:text-accent-mint transition-colors">{client.name}</h3>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-text-muted font-bold uppercase tracking-widest">{client.businessType}</span>
-              {client.accountManager && (
-                <span className="text-[9px] text-accent-mint/70 font-medium">Gestor: {client.accountManager}</span>
+    <div className="relative group h-full">
+      <Link 
+        to={`/clientes/${client.id}`}
+        className="glass glass-hover p-6 rounded-3xl block h-full overflow-hidden"
+      >
+        <div className="flex items-start justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-black font-bold text-xl overflow-hidden" style={{ backgroundColor: client.brandColor }}>
+              {client.logo ? (
+                <img src={client.logo} alt={client.name} className="w-full h-full object-cover" />
+              ) : (
+                client.name.charAt(0)
               )}
             </div>
+            <div>
+              <h3 className="font-medium text-lg leading-none mb-1 group-hover:text-accent-mint transition-colors">{client.name}</h3>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-text-muted font-bold uppercase tracking-widest">{client.businessType}</span>
+                {client.accountManager && (
+                  <span className="text-[9px] text-accent-mint/70 font-medium">Gestor: {client.accountManager}</span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+             <div className={cn(
+                "w-2 h-2 rounded-full",
+                health === 'GOOD' ? "bg-accent-mint shadow-[0_0_10px_#00D9A3]" : health === 'WARNING' ? "bg-accent-amber" : "bg-accent-coral shadow-[0_0_10px_#FF4D4D]"
+             )} />
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2">
-           <div className={cn(
-              "w-2 h-2 rounded-full",
-              health === 'GOOD' ? "bg-accent-mint shadow-[0_0_10px_#00D9A3]" : health === 'WARNING' ? "bg-accent-amber" : "bg-accent-coral shadow-[0_0_10px_#FF4D4D]"
-           )} />
-           <button 
-             onClick={(e) => onDelete(client.id, e)}
-             className="p-1.5 rounded-lg hover:bg-accent-coral/20 hover:text-accent-coral text-text-muted transition-all opacity-0 group-hover:opacity-100"
-             title="Excluir Cliente"
-           >
-             <Trash2 size={14} />
-           </button>
-        </div>
-      </div>
 
-      <div className="space-y-4">
-        <div className="flex justify-between items-baseline">
-           <span className="text-xs text-text-muted">ROAS Último Mês</span>
-           <span className="text-xl font-medium tracking-tight">{metrics ? metrics.roas.toFixed(2) : '--'}</span>
+        <div className="space-y-4">
+          <div className="flex justify-between items-baseline">
+             <span className="text-xs text-text-muted">ROAS Último Mês</span>
+             <span className="text-xl font-medium tracking-tight">{metrics ? metrics.roas.toFixed(2) : '--'}</span>
+          </div>
+          <div className="flex justify-between items-baseline">
+             <span className="text-xs text-text-muted">Faturamento</span>
+             <span className="text-lg font-medium">{last ? formatCurrency(last.revenue || 0) : '--'}</span>
+          </div>
         </div>
-        <div className="flex justify-between items-baseline">
-           <span className="text-xs text-text-muted">Faturamento</span>
-           <span className="text-lg font-medium">{last ? formatCurrency(last.revenue || 0) : '--'}</span>
-        </div>
-      </div>
 
-      <div className="mt-8 flex items-center justify-between border-t border-white/5 pt-4">
-        <div className="flex -space-x-1.5">
-          {client.channels.slice(0, 3).map((ch, i) => (
-             <div key={i} className="w-6 h-6 rounded-full bg-white/10 border border-bg-base flex items-center justify-center text-[8px] font-bold" title={ch}>
-               {ch.charAt(0)}
-             </div>
-          ))}
+        <div className="mt-8 flex items-center justify-between border-t border-white/5 pt-4">
+          <div className="flex -space-x-1.5">
+            {client.channels.slice(0, 3).map((ch, i) => (
+               <div key={i} className="w-6 h-6 rounded-full bg-white/10 border border-bg-base flex items-center justify-center text-[8px] font-bold" title={ch}>
+                 {ch.charAt(0)}
+               </div>
+            ))}
+          </div>
+          <span className="text-[10px] font-bold text-accent-mint flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+            DETALHES <TrendingUp size={10} />
+          </span>
         </div>
-        <span className="text-[10px] font-bold text-accent-mint flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
-          DETALHES <TrendingUp size={10} />
-        </span>
-      </div>
-    </Link>
+      </Link>
+      
+      <button 
+        onClick={(e) => onDelete(client.id, e)}
+        className="absolute top-6 right-6 p-2 rounded-xl bg-bg-base/80 backdrop-blur-md border border-white/5 text-text-muted hover:bg-accent-coral/20 hover:text-accent-coral transition-all opacity-0 group-hover:opacity-100 z-10"
+        title="Excluir Cliente"
+      >
+        <Trash2 size={16} />
+      </button>
+    </div>
   );
 }
 
-function ClientListItem({ client, onDelete }: { client: Client; onDelete: (id: string, e: React.MouseEvent) => void }) {
-  const [entries, setEntries] = useState<any[]>([]);
-
-  useEffect(() => {
-    storage.getEntries(client.id).then(setEntries);
-  }, [client.id]);
-
+function ClientListItem({ client, entries, onDelete }: { client: Client; entries: any[]; onDelete: (id: string, e: React.MouseEvent) => void }) {
   const last = entries[entries.length - 1];
   const metrics = last ? calculateMetrics(last, client.businessType) : null;
 
   return (
-    <Link 
-      to={`/clientes/${client.id}`}
-      className="glass glass-hover px-6 py-4 rounded-xl flex items-center gap-6 group"
-    >
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-black font-bold overflow-hidden shrink-0" style={{ backgroundColor: client.brandColor }}>
-        {client.logo ? (
-          <img src={client.logo} alt={client.name} className="w-full h-full object-cover" />
-        ) : (
-          client.name.charAt(0)
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <h4 className="font-medium group-hover:text-accent-mint transition-colors truncate">{client.name}</h4>
-        <div className="flex items-center gap-2">
-          <p className="text-[10px] text-text-muted uppercase font-bold tracking-widest">{client.businessType}</p>
-          {client.accountManager && (
-            <>
-              <span className="w-1 h-1 rounded-full bg-white/10" />
-              <p className="text-[10px] text-accent-mint/60 font-medium">Gestor: {client.accountManager}</p>
-            </>
+    <div className="relative group">
+      <Link 
+        to={`/clientes/${client.id}`}
+        className="glass glass-hover px-6 py-4 rounded-xl flex items-center gap-6"
+      >
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-black font-bold overflow-hidden shrink-0" style={{ backgroundColor: client.brandColor }}>
+          {client.logo ? (
+            <img src={client.logo} alt={client.name} className="w-full h-full object-cover" />
+          ) : (
+            client.name.charAt(0)
           )}
         </div>
-      </div>
-      <div className="hidden md:block w-32">
-        <p className="text-[9px] text-text-muted uppercase font-bold mb-1">ROAS</p>
-        <p className="text-sm font-medium">{metrics ? metrics.roas.toFixed(2) : '--'}</p>
-      </div>
-      <div className="hidden lg:block w-40">
-        <p className="text-[9px] text-text-muted uppercase font-bold mb-1">Faturamento</p>
-        <p className="text-sm font-medium">{last ? formatCurrency(last.revenue || 0) : '--'}</p>
-      </div>
-      <div className="flex items-center gap-2">
-        <button 
-          onClick={(e) => onDelete(client.id, e)}
-          className="p-2 rounded-lg hover:bg-accent-coral/20 hover:text-accent-coral text-text-muted transition-all opacity-0 group-hover:opacity-100"
-        >
-          <Trash2 size={16} />
-        </button>
-        <ArrowRight size={16} className="text-text-muted group-hover:text-white transition-colors" />
-      </div>
-    </Link>
+        <div className="flex-1 min-w-0">
+          <h4 className="font-medium group-hover:text-accent-mint transition-colors truncate">{client.name}</h4>
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] text-text-muted uppercase font-bold tracking-widest">{client.businessType}</p>
+            {client.accountManager && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-white/10" />
+                <p className="text-[10px] text-accent-mint/60 font-medium">Gestor: {client.accountManager}</p>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="hidden md:block w-32">
+          <p className="text-[9px] text-text-muted uppercase font-bold mb-1">ROAS</p>
+          <p className="text-sm font-medium">{metrics ? metrics.roas.toFixed(2) : '--'}</p>
+        </div>
+        <div className="hidden lg:block w-40">
+          <p className="text-[9px] text-text-muted uppercase font-bold mb-1">Faturamento</p>
+          <p className="text-sm font-medium">{last ? formatCurrency(last.revenue || 0) : '--'}</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <ArrowRight size={16} className="text-text-muted group-hover:text-white transition-colors" />
+        </div>
+      </Link>
+      
+      <button 
+        onClick={(e) => onDelete(client.id, e)}
+        className="absolute right-12 top-1/2 -translate-y-1/2 p-2.5 rounded-xl bg-white/5 border border-white/5 text-text-muted hover:bg-accent-coral/20 hover:text-accent-coral transition-all opacity-0 group-hover:opacity-100 z-10"
+        title="Excluir Cliente"
+      >
+        <Trash2 size={18} />
+      </button>
+    </div>
   );
 }

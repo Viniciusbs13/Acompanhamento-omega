@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { 
   TrendingUp, TrendingDown, Clock, Plus, FileText, 
   BarChart3, Settings, Share2, Maximize2, Download,
@@ -56,6 +58,63 @@ export function ClientDashboard() {
   };
   const { entries, addEntry, removeEntry, loading: loadingEntries } = useEntries(id || '');
 
+  const lastEntry = useMemo(() => entries[entries.length - 1], [entries]);
+  const metrics = useMemo(() => lastEntry ? calculateMetrics(lastEntry, client?.businessType) : null, [lastEntry, client?.businessType]);
+  const previousEntry = useMemo(() => entries.length > 1 ? entries[entries.length - 2] : undefined, [entries]);
+  const previousMetrics = useMemo(() => previousEntry ? calculateMetrics(previousEntry, client?.businessType) : undefined, [previousEntry, client?.businessType]);
+  const insights = useMemo(() => metrics ? generateInsights(metrics, previousMetrics) : [], [metrics, previousMetrics]);
+  const health = useMemo(() => metrics ? getHealthStatus(metrics, 4) : 'GOOD', [metrics]);
+
+  const chartData = useMemo(() => entries.map(e => ({
+    name: new Date(e.date).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
+    investimento: e.investment,
+    faturamento: e.revenue || 0,
+    roas: (e.revenue || 0) / (e.investment || 1)
+  })), [entries]);
+
+  const handleExportPDF = async () => {
+    if (!containerRef.current) return;
+    
+    const toastId = toast.loading("Gerando PDF...");
+    try {
+      const element = containerRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#0A0A0B',
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight,
+        onclone: (clonedDoc) => {
+          // Workaround for html2canvas not supporting modern CSS color functions like oklab/oklch
+          const styleElements = clonedDoc.getElementsByTagName('style');
+          for (let i = 0; i < styleElements.length; i++) {
+            const style = styleElements[i];
+            if (style.innerHTML.includes('oklch') || style.innerHTML.includes('oklab')) {
+              style.innerHTML = style.innerHTML
+                .replace(/oklch\([^)]+\)/g, '#ffffff')
+                .replace(/oklab\([^)]+\)/g, '#ffffff');
+            }
+          }
+        }
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(`Relatorio-${client?.name || 'Cliente'}-${new Date().toLocaleDateString()}.pdf`);
+      toast.success("PDF exportado com sucesso!", { id: toastId });
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+      toast.error("Erro ao gerar PDF. Tente novamente.", { id: toastId });
+    }
+  };
+
   if (loadingClient || loadingEntries) {
     return (
       <div className="py-32 flex justify-center">
@@ -73,20 +132,6 @@ export function ClientDashboard() {
       </div>
     );
   }
-
-  const lastEntry = entries[entries.length - 1];
-  const metrics = lastEntry ? calculateMetrics(lastEntry, client.businessType) : null;
-  const previousEntry = entries.length > 1 ? entries[entries.length - 2] : undefined;
-  const previousMetrics = previousEntry ? calculateMetrics(previousEntry, client.businessType) : undefined;
-  const insights = metrics ? generateInsights(metrics, previousMetrics) : [];
-  const health = metrics ? getHealthStatus(metrics, 4) : 'GOOD';
-
-  const chartData = entries.map(e => ({
-    name: new Date(e.date).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
-    investimento: e.investment,
-    faturamento: e.revenue || 0,
-    roas: (e.revenue || 0) / (e.investment || 1)
-  }));
 
   const tabs = [
     { id: 'overview', label: 'Dashboard', icon: BarChart3 },
@@ -162,7 +207,10 @@ export function ClientDashboard() {
             <Maximize2 size={16} />
             Modo Apresentação
           </button>
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-accent-mint text-black font-bold rounded-xl hover:bg-accent-mint/90 transition-all shadow-lg shadow-accent-mint/20">
+          <button 
+            onClick={handleExportPDF}
+            className="flex items-center gap-2 px-5 py-2.5 bg-accent-mint text-black font-bold rounded-xl hover:bg-accent-mint/90 transition-all shadow-lg shadow-accent-mint/20"
+          >
             <Download size={16} />
             Exportar PDF
           </button>
@@ -219,9 +267,9 @@ export function ClientDashboard() {
                       <div className="w-2 h-2 rounded-full bg-white/40" /> Meta
                     </div>
                  </div>
-                 <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                       <AreaChart data={chartData}>
+                 <div className="h-[300px] min-w-0 w-full overflow-hidden">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50} key={activeTab}>
+                       <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                           <defs>
                             <linearGradient id="clientColor" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor={client.brandColor} stopOpacity={0.3}/>
@@ -496,7 +544,7 @@ export function ClientDashboard() {
                   <div className="pt-6 border-t border-white/5 flex justify-end gap-3">
                     <button className="px-6 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-sm font-medium transition-all">Salvar rascunho</button>
                     <button 
-                      onClick={() => toast.success("Relatório gerado com sucesso!")}
+                      onClick={handleExportPDF}
                       className="px-6 py-2.5 rounded-xl bg-accent-mint text-black font-bold text-sm transition-all hover:bg-accent-mint/90 shadow-lg shadow-accent-mint/20"
                     >
                       Exportar Relatório

@@ -1,5 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { 
   FileText, Search, ChevronRight, User, Calendar, ExternalLink, Filter,
   TrendingUp, DollarSign, Target, Users as UsersIcon, Plus, Download, Share2
@@ -19,6 +21,7 @@ export function Reports() {
   const [clients, setClients] = useState<any[]>([]);
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -57,6 +60,46 @@ export function Reports() {
       totalSales: entries.reduce((acc, c) => acc + (c.sales || 0), 0),
     };
   }, [entries]);
+
+  const handleExportPDF = async () => {
+    if (!reportRef.current) return;
+    
+    const toastId = toast.loading("Gerando PDF...");
+    try {
+      const element = reportRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#0A0A0B',
+        onclone: (clonedDoc) => {
+          const styleElements = clonedDoc.getElementsByTagName('style');
+          for (let i = 0; i < styleElements.length; i++) {
+            const style = styleElements[i];
+            if (style.innerHTML.includes('oklch') || style.innerHTML.includes('oklab')) {
+              style.innerHTML = style.innerHTML
+                .replace(/oklch\([^)]+\)/g, '#ffffff')
+                .replace(/oklab\([^)]+\)/g, '#ffffff');
+            }
+          }
+        }
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(`Relatorio-${selectedClient?.name || 'Cliente'}-${new Date().toLocaleDateString()}.pdf`);
+      toast.success("PDF exportado com sucesso!", { id: toastId });
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+      toast.error("Erro ao gerar PDF. Tente novamente.", { id: toastId });
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -115,6 +158,7 @@ export function Reports() {
             {selectedClient ? (
               <motion.div
                 key={selectedClientId}
+                ref={reportRef}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
@@ -143,7 +187,7 @@ export function Reports() {
                          <option>Histórico Geral</option>
                        </select>
                        <button 
-                        onClick={() => toast.success("Relatório pronto para download!")}
+                        onClick={handleExportPDF}
                         className="flex items-center gap-2 bg-accent-mint text-black px-4 py-2 rounded-xl text-sm font-bold hover:bg-accent-mint/90 transition-all"
                        >
                          <Download size={16} /> PDF
@@ -176,10 +220,10 @@ export function Reports() {
                      <div className="flex gap-4">
                         <button className="px-6 py-2.5 rounded-xl border border-white/10 text-sm font-medium hover:bg-white/5">Salvar Rascunho</button>
                         <button 
-                           onClick={() => toast.success("Enviado para o cliente!")}
+                           onClick={handleExportPDF}
                            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all"
                         >
-                           <Share2 size={16} /> Compartilhar
+                           <Share2 size={16} /> Exportar
                         </button>
                      </div>
                   </div>
