@@ -197,7 +197,7 @@ export function Reports() {
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     <ReportKPICard icon={DollarSign} label="Faturamento" value={formatCurrency(stats?.totalRev || 0)} color="text-accent-mint" />
-                    <ReportKPICard icon={Target} label="ROAS Médio" value={`${metrics?.roas.toFixed(2)}x`} color="text-white" />
+                    <ReportKPICard icon={Target} label="ROAS Médio" value={`${(metrics?.roas || 0).toFixed(2)}x`} color="text-white" />
                     <ReportKPICard icon={UsersIcon} label="Total Leads" value={stats?.totalLeads || 0} color="text-text-secondary" />
                     <ReportKPICard icon={TrendingUp} label="Vendas" value={stats?.totalSales || 0} color="text-accent-mint" />
                   </div>

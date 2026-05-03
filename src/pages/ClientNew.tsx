@@ -80,7 +80,7 @@ export function ClientNew() {
   const onSubmit = async (data: any) => {
     try {
       const newClient: Client = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: Math.random().toString(36).substring(2, 11),
         name: data.name,
         accountManager: data.accountManager,
         logo: logoBase64 || null,

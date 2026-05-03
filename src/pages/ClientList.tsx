@@ -181,7 +181,7 @@ function ClientGridItem({ client, entries, onDelete }: { client: Client; entries
         <div className="space-y-4">
           <div className="flex justify-between items-baseline">
              <span className="text-xs text-text-muted">ROAS Último Mês</span>
-             <span className="text-xl font-medium tracking-tight">{metrics ? metrics.roas.toFixed(2) : '--'}</span>
+             <span className="text-xl font-medium tracking-tight">{metrics ? (metrics.roas || 0).toFixed(2) : '--'}</span>
           </div>
           <div className="flex justify-between items-baseline">
              <span className="text-xs text-text-muted">Faturamento</span>
@@ -245,7 +245,7 @@ function ClientListItem({ client, entries, onDelete }: { client: Client; entries
         </div>
         <div className="hidden md:block w-32">
           <p className="text-[9px] text-text-muted uppercase font-bold mb-1">ROAS</p>
-          <p className="text-sm font-medium">{metrics ? metrics.roas.toFixed(2) : '--'}</p>
+          <p className="text-sm font-medium">{metrics ? (metrics.roas || 0).toFixed(2) : '--'}</p>
         </div>
         <div className="hidden lg:block w-40">
           <p className="text-[9px] text-text-muted uppercase font-bold mb-1">Faturamento</p>

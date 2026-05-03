@@ -324,7 +324,7 @@ export function ClientDashboard() {
                     </div>
                  </div>
                  <div className="h-[300px] min-w-0 w-full overflow-hidden">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50} key={activeTab}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} debounce={50} key={`chart-${activeTab}`}>
                        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                           <defs>
                             <linearGradient id="clientColor" x1="0" y1="0" x2="0" y2="1">
@@ -630,9 +630,9 @@ export function ClientDashboard() {
                 <div className="glass rounded-3xl p-8">
                   <h4 className="font-medium mb-6">Métricas do Período</h4>
                   <div className="space-y-6">
-                    <SummaryItem label="ROAS Médio" value={`${metrics?.roas.toFixed(2)}x`} />
+                    <SummaryItem label="ROAS Médio" value={`${(metrics?.roas || 0).toFixed(2)}x`} />
                     <SummaryItem label="CAC Médio" value={formatCurrency(metrics?.cac || 0)} />
-                    <SummaryItem label="ROI Médio" value={`${metrics?.roi?.toFixed(1)}%`} />
+                    <SummaryItem label="ROI Médio" value={`${(metrics?.roi || 0).toFixed(1)}%`} />
                     <SummaryItem label="Faturamento" value={formatCurrency(entries.reduce((acc, curr) => acc + (curr.revenue || 0), 0))} />
                   </div>
                 </div>

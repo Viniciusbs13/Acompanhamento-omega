@@ -5,21 +5,24 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const formatCurrency = (value: number) => {
+export const formatCurrency = (value: number | undefined | null) => {
+  const val = typeof value === 'number' ? value : 0;
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
-  }).format(value);
+  }).format(val);
 };
 
-export const formatPercent = (value: number) => {
+export const formatPercent = (value: number | undefined | null) => {
+  const val = typeof value === 'number' ? value : 0;
   return new Intl.NumberFormat('pt-BR', {
     style: 'percent',
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
-  }).format(value / 100);
+  }).format(val / 100);
 };
 
-export const formatNumber = (value: number) => {
-  return new Intl.NumberFormat('pt-BR').format(value);
+export const formatNumber = (value: number | undefined | null) => {
+  const val = typeof value === 'number' ? value : 0;
+  return new Intl.NumberFormat('pt-BR').format(val);
 };

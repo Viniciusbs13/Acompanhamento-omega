@@ -51,6 +51,8 @@ function cleanData(data: any) {
   Object.keys(clean).forEach(key => {
     if (clean[key] === undefined) {
       delete clean[key];
+    } else if (typeof clean[key] === 'number' && isNaN(clean[key])) {
+      clean[key] = 0;
     } else if (clean[key] !== null && typeof clean[key] === 'object' && !Array.isArray(clean[key])) {
       clean[key] = cleanData(clean[key]);
     }

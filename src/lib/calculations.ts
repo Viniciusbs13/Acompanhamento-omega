@@ -1,7 +1,7 @@
 import { MetricEntry, CalculatedMetrics, BusinessType, Client, StatusHealth } from '../types';
 
 export const calculateMetrics = (entry: MetricEntry, type: BusinessType): CalculatedMetrics => {
-  const invest = entry.investment || 0;
+  const invest = parseFloat(entry.investment as any) || 0;
   const metrics: CalculatedMetrics = {
     roas: 0,
     cac: 0,
@@ -9,7 +9,17 @@ export const calculateMetrics = (entry: MetricEntry, type: BusinessType): Calcul
     conversion: 0,
   };
 
-  if (invest === 0) return metrics;
+  if (invest <= 0) {
+    metrics.profit = (entry.revenue || 0) - invest;
+    return metrics;
+  }
+
+  // Helper to ensure numbers are finite and not NaN
+  const safeDiv = (num: number, den: number) => {
+    if (!den || den === 0) return 0;
+    const res = num / den;
+    return isFinite(res) ? res : 0;
+  };
 
   switch (type) {
     case 'SERVICE_BOOKING': {
@@ -19,14 +29,14 @@ export const calculateMetrics = (entry: MetricEntry, type: BusinessType): Calcul
       const bookings = entry.bookings || 0;
       const shows = entry.shows || 0;
 
-      metrics.roas = revenue / invest;
-      metrics.cac = sales > 0 ? invest / sales : 0;
-      metrics.ticket = sales > 0 ? revenue / sales : 0;
-      metrics.conversion = leads > 0 ? (sales / leads) * 100 : 0;
-      metrics.cpl = invest / (leads || 1);
-      metrics.bookingRate = leads > 0 ? (bookings / leads) * 100 : 0;
-      metrics.showRate = bookings > 0 ? (shows / bookings) * 100 : 0;
-      metrics.closeRate = shows > 0 ? (sales / shows) * 100 : 0;
+      metrics.roas = safeDiv(revenue, invest);
+      metrics.cac = sales > 0 ? safeDiv(invest, sales) : 0;
+      metrics.ticket = sales > 0 ? safeDiv(revenue, sales) : 0;
+      metrics.conversion = leads > 0 ? safeDiv(sales, leads) * 100 : 0;
+      metrics.cpl = safeDiv(invest, leads);
+      metrics.bookingRate = leads > 0 ? safeDiv(bookings, leads) * 100 : 0;
+      metrics.showRate = bookings > 0 ? safeDiv(shows, bookings) * 100 : 0;
+      metrics.closeRate = shows > 0 ? safeDiv(sales, shows) * 100 : 0;
       break;
     }
 
@@ -36,12 +46,12 @@ export const calculateMetrics = (entry: MetricEntry, type: BusinessType): Calcul
       const sessions = entry.sessions || 0;
       const addCart = entry.addCart || 0;
 
-      metrics.roas = revenue / invest;
-      metrics.cac = purchases > 0 ? invest / purchases : 0;
-      metrics.ticket = purchases > 0 ? revenue / purchases : 0;
-      metrics.conversion = sessions > 0 ? (purchases / sessions) * 100 : 0;
-      metrics.cpc = invest / (sessions || 1);
-      metrics.abandonRate = addCart > 0 ? ((addCart - purchases) / addCart) * 100 : 0;
+      metrics.roas = safeDiv(revenue, invest);
+      metrics.cac = purchases > 0 ? safeDiv(invest, purchases) : 0;
+      metrics.ticket = purchases > 0 ? safeDiv(revenue, purchases) : 0;
+      metrics.conversion = sessions > 0 ? safeDiv(purchases, sessions) * 100 : 0;
+      metrics.cpc = safeDiv(invest, sessions);
+      metrics.abandonRate = addCart > 0 ? safeDiv(addCart - purchases, addCart) * 100 : 0;
       break;
     }
 
@@ -51,12 +61,12 @@ export const calculateMetrics = (entry: MetricEntry, type: BusinessType): Calcul
       const leads = entry.leads || 0;
       const mqls = entry.mqls || 0;
 
-      metrics.roas = revenue / invest;
-      metrics.cac = sales > 0 ? invest / sales : 0;
-      metrics.ticket = sales > 0 ? revenue / sales : 0;
-      metrics.conversion = leads > 0 ? (sales / leads) * 100 : 0;
-      metrics.cpl = invest / (leads || 1);
-      metrics.mqlRate = leads > 0 ? (mqls / leads) * 100 : 0;
+      metrics.roas = safeDiv(revenue, invest);
+      metrics.cac = sales > 0 ? safeDiv(invest, sales) : 0;
+      metrics.ticket = sales > 0 ? safeDiv(revenue, sales) : 0;
+      metrics.conversion = leads > 0 ? safeDiv(sales, leads) * 100 : 0;
+      metrics.cpl = safeDiv(invest, leads);
+      metrics.mqlRate = leads > 0 ? safeDiv(mqls, leads) * 100 : 0;
       break;
     }
 
@@ -66,17 +76,17 @@ export const calculateMetrics = (entry: MetricEntry, type: BusinessType): Calcul
       const clicks = entry.waClicks || 0;
       const convs = entry.waConversations || 0;
 
-      metrics.roas = revenue / invest;
-      metrics.cac = sales > 0 ? invest / sales : 0;
-      metrics.ticket = sales > 0 ? revenue / sales : 0;
-      metrics.conversion = clicks > 0 ? (sales / clicks) * 100 : 0;
-      metrics.cpc = invest / (clicks || 1);
-      metrics.waResponseRate = clicks > 0 ? (convs / clicks) * 100 : 0;
+      metrics.roas = safeDiv(revenue, invest);
+      metrics.cac = sales > 0 ? safeDiv(invest, sales) : 0;
+      metrics.ticket = sales > 0 ? safeDiv(revenue, sales) : 0;
+      metrics.conversion = clicks > 0 ? safeDiv(sales, clicks) * 100 : 0;
+      metrics.cpc = safeDiv(invest, clicks);
+      metrics.waResponseRate = clicks > 0 ? safeDiv(convs, clicks) * 100 : 0;
       break;
     }
   }
 
-  metrics.roi = invest > 0 ? ((entry.revenue || 0) - invest) / invest * 100 : 0;
+  metrics.roi = invest > 0 ? safeDiv((entry.revenue || 0) - invest, invest) * 100 : 0;
   metrics.profit = entry.profit || (entry.revenue || 0) - invest;
   metrics.cac = entry.cac || metrics.cac; // Use manual CAC if provided
 

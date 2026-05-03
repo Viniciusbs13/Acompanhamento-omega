@@ -216,7 +216,7 @@ function GlobalClientCard({ client, index, entries }: any) {
         <div className="grid grid-cols-2 gap-4">
            <div className="bg-white/5 p-3 rounded-2xl">
               <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">ROAS</p>
-              <p className="text-lg font-medium">{metrics ? metrics.roas.toFixed(2) : '--'}</p>
+              <p className="text-lg font-medium">{metrics ? (metrics.roas || 0).toFixed(2) : '--'}</p>
            </div>
            <div className="bg-white/5 p-3 rounded-2xl">
               <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">FATURAMENTO</p>
