@@ -6,9 +6,11 @@ import { storage } from '../lib/storage';
 import { Client } from '../types';
 import { calculateMetrics, getHealthStatus } from '../lib/calculations';
 import { cn, formatCurrency } from '../lib/utils';
+import { useVisibility } from '../contexts/VisibilityContext';
 import { toast } from 'sonner';
 
 export function ClientList() {
+  const { isVisible } = useVisibility();
   const [clients, setClients] = useState<Client[]>([]);
   const [allEntries, setAllEntries] = useState<Record<string, any[]>>({});
   const [search, setSearch] = useState('');
@@ -141,6 +143,7 @@ export function ClientList() {
 }
 
 function ClientGridItem({ client, entries, onDelete }: { client: Client; entries: any[]; onDelete: (id: string, e: React.MouseEvent) => void }) {
+  const { isVisible } = useVisibility();
   const last = entries[entries.length - 1];
   const metrics = last ? calculateMetrics(last, client.businessType) : null;
   const health = metrics ? getHealthStatus(metrics, 4) : 'GOOD';
@@ -179,14 +182,29 @@ function ClientGridItem({ client, entries, onDelete }: { client: Client; entries
         </div>
 
         <div className="space-y-4">
-          <div className="flex justify-between items-baseline">
-             <span className="text-xs text-text-muted">ROAS Último Mês</span>
-             <span className="text-xl font-medium tracking-tight">{metrics ? (metrics.roas || 0).toFixed(2) : '--'}</span>
-          </div>
-          <div className="flex justify-between items-baseline">
-             <span className="text-xs text-text-muted">Faturamento</span>
-             <span className="text-lg font-medium">{last ? formatCurrency(last.revenue || 0) : '--'}</span>
-          </div>
+          {client.performanceMode === 'LEADS' ? (
+            <>
+              <div className="flex justify-between items-baseline">
+                 <span className="text-xs text-text-muted">Leads Totais</span>
+                 <span className="text-xl font-medium tracking-tight">{last?.leads || 0}</span>
+              </div>
+              <div className="flex justify-between items-baseline">
+                 <span className="text-xs text-text-muted">Vendas</span>
+                 <span className="text-lg font-medium">{last?.sales || 0}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between items-baseline">
+                 <span className="text-xs text-text-muted">ROAS Último Mês</span>
+                 <span className="text-xl font-medium tracking-tight">{isVisible ? (metrics ? (metrics.roas || 0).toFixed(2) : '--') : '•••••'}</span>
+              </div>
+              <div className="flex justify-between items-baseline">
+                 <span className="text-xs text-text-muted">Faturamento</span>
+                 <span className="text-lg font-medium">{isVisible ? (last ? formatCurrency(last.revenue || 0) : '--') : '•••••'}</span>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="mt-8 flex items-center justify-between border-t border-white/5 pt-4">
@@ -215,6 +233,7 @@ function ClientGridItem({ client, entries, onDelete }: { client: Client; entries
 }
 
 function ClientListItem({ client, entries, onDelete }: { client: Client; entries: any[]; onDelete: (id: string, e: React.MouseEvent) => void }) {
+  const { isVisible } = useVisibility();
   const last = entries[entries.length - 1];
   const metrics = last ? calculateMetrics(last, client.businessType) : null;
 
@@ -244,12 +263,22 @@ function ClientListItem({ client, entries, onDelete }: { client: Client; entries
           </div>
         </div>
         <div className="hidden md:block w-32">
-          <p className="text-[9px] text-text-muted uppercase font-bold mb-1">ROAS</p>
-          <p className="text-sm font-medium">{metrics ? (metrics.roas || 0).toFixed(2) : '--'}</p>
+          <p className="text-[9px] text-text-muted uppercase font-bold mb-1">{client.performanceMode === 'LEADS' ? 'Leads' : 'ROAS'}</p>
+          <p className="text-sm font-medium">
+            {client.performanceMode === 'LEADS' 
+              ? (last?.leads || 0)
+              : (isVisible ? (metrics ? (metrics.roas || 0).toFixed(2) : '--') : '•••••')
+            }
+          </p>
         </div>
         <div className="hidden lg:block w-40">
-          <p className="text-[9px] text-text-muted uppercase font-bold mb-1">Faturamento</p>
-          <p className="text-sm font-medium">{last ? formatCurrency(last.revenue || 0) : '--'}</p>
+          <p className="text-[9px] text-text-muted uppercase font-bold mb-1">{client.performanceMode === 'LEADS' ? 'Vendas' : 'Faturamento'}</p>
+          <p className="text-sm font-medium">
+            {client.performanceMode === 'LEADS'
+              ? (last?.sales || 0)
+              : (isVisible ? (last ? formatCurrency(last.revenue || 0) : '--') : '•••••')
+            }
+          </p>
         </div>
         <div className="flex items-center gap-4">
           <ArrowRight size={16} className="text-text-muted group-hover:text-white transition-colors" />

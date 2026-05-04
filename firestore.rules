@@ -41,8 +41,8 @@ service cloud.firestore {
     // Clients
     match /clients/{clientId} {
       function isValidClient(data) {
-        return data.name is string && data.name.size() <= 100 &&
-               data.businessType in ['SERVICE_BOOKING', 'ECOMMERCE', 'B2B_LEADS', 'WHATSAPP'] &&
+        return data.name is string && data.name.size() <= 150 &&
+               data.businessType in ['SERVICE_BOOKING', 'ECOMMERCE', 'B2B_LEADS', 'WHATSAPP', 'INFO_PRODUCTS', 'REAL_ESTATE', 'LOCAL_BUSINESS', 'VIDEO_PRODUCTION', 'CONTENT_EDITING'] &&
                data.ownerId == request.auth.uid &&
                data.brandColor is string &&
                data.smartGoal is map;
@@ -59,7 +59,7 @@ service cloud.firestore {
       match /entries/{entryId} {
         function isValidEntry(data) {
           return data.clientId == clientId &&
-                 data.investment is number &&
+                 (data.investment is number || data.investment is int) &&
                  data.date is string &&
                  data.ownerId == request.auth.uid;
         }

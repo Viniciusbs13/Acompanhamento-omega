@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { storage } from '../lib/storage';
 import { calculateMetrics, getHealthStatus } from '../lib/calculations';
 import { formatCurrency, cn } from '../lib/utils';
+import { useVisibility } from '../contexts/VisibilityContext';
 import { ResponsiveContainer, ComposedChart, Bar, Line, Tooltip as RechartsTooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 interface DashboardStats {
@@ -16,7 +17,14 @@ interface DashboardStats {
   clientEntries: Record<string, any[]>;
 }
 
+const isContentDelayed = (client: any) => {
+  if (!client.contentPlan || !client.contentPlan.items) return false;
+  const today = new Date().toISOString().split('T')[0];
+  return client.contentPlan.items.some((item: any) => item.status === 'PLANNED' && item.targetDate < today);
+};
+
 export function Dashboard() {
+  const { isVisible } = useVisibility();
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
@@ -137,7 +145,7 @@ export function Dashboard() {
                 <RechartsTooltip 
                   contentStyle={{ background: '#0A0A0B', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px' }}
                   itemStyle={{ color: '#fff', fontSize: '12px' }}
-                  formatter={(val: any) => formatCurrency(val)}
+                  formatter={(val: any) => isVisible ? formatCurrency(val) : '•••••'}
                 />
                 <Bar dataKey="revenue" fill="url(#globalRev)" radius={[6, 6, 0, 0]} barSize={40} />
                 <Line type="monotone" dataKey="investment" stroke="rgba(255,255,255,0.3)" strokeWidth={2} dot={{ r: 4, fill: '#00D9A3', strokeWidth: 0 }} />
@@ -194,6 +202,7 @@ export function Dashboard() {
 }
 
 function KPICard({ label, value, isCurrency = false, variation, icon }: any) {
+  const { isVisible } = useVisibility();
   return (
     <div className="glass p-6 rounded-2xl glass-hover relative group overflow-hidden">
       <div className="flex items-center justify-between mb-4">
@@ -204,11 +213,11 @@ function KPICard({ label, value, isCurrency = false, variation, icon }: any) {
       </div>
       <div className="flex items-baseline gap-1">
         <span className="text-3xl font-medium tracking-tighter">
-          {isCurrency ? formatCurrency(value).replace('R$', '').trim() : typeof value === 'number' ? value.toFixed(value < 10 ? 2 : 0) : value}
+          {!isVisible ? '•••••' : (isCurrency ? formatCurrency(value).replace('R$', '').trim() : typeof value === 'number' ? value.toFixed(value < 10 ? 2 : 0) : value)}
         </span>
-        {isCurrency && <span className="text-sm text-text-muted">BRL</span>}
+        {isVisible && isCurrency && <span className="text-sm text-text-muted">BRL</span>}
       </div>
-      {variation && (
+      {isVisible && variation && (
         <div className={cn("text-[10px] font-bold mt-2 flex items-center gap-1", variation > 0 ? "text-accent-mint" : "text-accent-coral")}>
            {variation > 0 ? '↑' : '↓'} {Math.abs(variation)}% 
            <span className="text-text-muted opacity-60">vs mês anterior</span>
@@ -220,6 +229,7 @@ function KPICard({ label, value, isCurrency = false, variation, icon }: any) {
 }
 
 function GlobalClientCard({ client, index, entries }: any) {
+  const { isVisible } = useVisibility();
   const last = entries[entries.length - 1];
   const metrics = last ? calculateMetrics(last, client.businessType) : null;
   
@@ -234,23 +244,31 @@ function GlobalClientCard({ client, index, entries }: any) {
     >
       <Link 
         to={`/clientes/${client.id}`}
-        className="glass glass-hover p-6 rounded-3xl block group relative"
+        className={cn(
+          "glass glass-hover p-6 rounded-3xl block group relative transition-all duration-500",
+          isContentDelayed(client) && "border border-accent-coral/50 bg-accent-coral/[0.02]"
+        )}
       >
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-black font-bold" style={{ backgroundColor: client.brandColor }}>
-            {client.logo ? (
-              <img src={client.logo} alt={client.name} className="w-full h-full object-cover" />
-            ) : (
-              client.name.charAt(0)
+          <div className="relative">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-black font-bold" style={{ backgroundColor: client.brandColor }}>
+              {client.logo ? (
+                <img src={client.logo} alt={client.name} className="w-full h-full object-cover" />
+              ) : (
+                client.name.charAt(0)
+              )}
+            </div>
+            {isContentDelayed(client) && (
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent-coral rounded-full border-2 border-bg-base animate-pulse shadow-[0_0_10px_rgba(255,77,77,0.8)]" />
             )}
           </div>
           <div>
-            <h4 className="font-medium group-hover:text-accent-mint transition-colors">{client.name}</h4>
+            <h4 className={cn("font-medium transition-colors", isContentDelayed(client) ? "text-accent-coral font-bold" : "group-hover:text-accent-mint")}>{client.name}</h4>
             <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">{client.businessType.replace('_', ' ')}</p>
           </div>
         </div>
         
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 mb-4">
            {isRealEstate ? (
              <>
                <div className="bg-white/5 p-3 rounded-2xl">
@@ -273,21 +291,50 @@ function GlobalClientCard({ client, index, entries }: any) {
                   <p className="text-lg font-medium">{last?.sales || 0}</p>
                </div>
              </>
+           ) : client.performanceMode === 'LEADS' ? (
+             <>
+               <div className="bg-white/5 p-3 rounded-2xl">
+                  <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">LEADS</p>
+                  <p className="text-lg font-medium">{last?.leads || 0}</p>
+               </div>
+               <div className="bg-white/5 p-3 rounded-2xl">
+                  <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">VENDAS</p>
+                  <p className="text-lg font-medium">{last?.sales || 0}</p>
+               </div>
+             </>
            ) : (
              <>
                <div className="bg-white/5 p-3 rounded-2xl">
                   <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">ROAS</p>
-                  <p className="text-lg font-medium">{metrics ? (metrics.roas || 0).toFixed(2) : '--'}</p>
+                  <p className="text-lg font-medium">{isVisible ? (metrics ? (metrics.roas || 0).toFixed(2) : '--') : '•••••'}</p>
                </div>
                <div className="bg-white/5 p-3 rounded-2xl">
                   <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">FATURAMENTO</p>
-                  <p className="text-lg font-medium tracking-tight text-white/90">{last ? formatCurrency(last.revenue || 0).replace('R$', '').trim() : '--'}</p>
+                  <p className="text-lg font-medium tracking-tight text-white/90">{last ? (isVisible ? formatCurrency(last.revenue || 0).replace('R$', '').trim() : '•••••') : '--'}</p>
                </div>
              </>
            )}
         </div>
 
-        <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
+        {client.contentPlan && (
+          <div className={cn(
+            "p-3 rounded-2xl flex items-center justify-between border transition-colors mb-4",
+            isContentDelayed(client) ? "bg-accent-coral/10 border-accent-coral/20" : "bg-white/5 border-white/5"
+          )}>
+            <div className="flex items-center gap-2">
+              <Activity size={14} className={isContentDelayed(client) ? "text-accent-coral" : "text-accent-mint"} />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Vídeos Postados</span>
+            </div>
+            <div className="text-xs font-bold">
+              <span className={cn(isContentDelayed(client) ? "text-accent-coral" : "text-white")}>
+                {client.contentPlan.items?.filter((i: any) => i.status === 'POSTED').length || 0}
+              </span>
+              <span className="text-text-muted"> / {client.contentPlan.total}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-2 pt-4 border-t border-white/5 flex items-center justify-between">
            <div className="flex items-center gap-1.5">
              <Activity size={12} className="text-accent-mint" />
              <span className="text-[10px] text-text-muted font-bold uppercase tracking-widest">Saudável</span>

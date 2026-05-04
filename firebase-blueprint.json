@@ -19,11 +19,19 @@
         "accountManager": { "type": "string" },
         "logo": { "type": "string" },
         "brandColor": { "type": "string" },
-        "businessType": { "type": "string", "enum": ["SERVICE_BOOKING", "ECOMMERCE", "B2B_LEADS", "WHATSAPP"] },
+        "businessType": { "type": "string", "enum": ["SERVICE_BOOKING", "ECOMMERCE", "B2B_LEADS", "WHATSAPP", "INFO_PRODUCTS", "REAL_ESTATE", "LOCAL_BUSINESS", "VIDEO_PRODUCTION", "CONTENT_EDITING"] },
         "smartGoal": { "$ref": "SmartGoal" },
         "channels": { "type": "array", "items": { "type": "string" } },
         "createdAt": { "type": "string", "format": "date-time" },
-        "ownerId": { "type": "string" }
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string" },
+        "customFunnelSteps": { "type": "array" },
+        "ownerNames": { "type": "string" },
+        "planValue": { "type": "number" },
+        "planScope": { "type": "string" },
+        "contractUrl": { "type": "string" },
+        "managementStatus": { "type": "string", "enum": ["GREEN", "YELLOW", "RED"] },
+        "billingModel": { "type": "string", "enum": ["RECURRING", "ONE_OFF"] }
       },
       "required": ["name", "brandColor", "businessType", "smartGoal", "ownerId"]
     },
@@ -64,6 +72,7 @@
         "waClicks": { "type": "number" },
         "waConversations": { "type": "number" },
         "qualifiedLeads": { "type": "number" },
+        "customData": { "type": "object" },
         "ownerId": { "type": "string" }
       },
       "required": ["clientId", "date", "investment", "ownerId"]

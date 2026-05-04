@@ -19,9 +19,17 @@ import {
 import { storage } from '../lib/storage';
 import { Client, ManagementFlag } from '../types';
 import { formatCurrency, cn } from '../lib/utils';
+import { useVisibility } from '../contexts/VisibilityContext';
 import { toast } from 'sonner';
 
+const isContentDelayed = (client: Client) => {
+  if (!client.contentPlan || !client.contentPlan.items) return false;
+  const today = new Date().toISOString().split('T')[0];
+  return client.contentPlan.items.some((item: any) => item.status === 'PLANNED' && item.targetDate < today);
+};
+
 export function Management() {
+  const { isVisible } = useVisibility();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -46,9 +54,10 @@ export function Management() {
 
   const stats = useMemo(() => {
     const active = clients.length;
-    const mrr = clients.reduce((acc, c) => acc + (c.planValue || 0), 0);
+    const mrr = clients.filter(c => c.billingModel === 'RECURRING' || !c.billingModel).reduce((acc, c) => acc + (c.planValue || 0), 0);
+    const projects = clients.filter(c => c.billingModel === 'ONE_OFF').reduce((acc, c) => acc + (c.planValue || 0), 0);
     const healthy = clients.filter(c => c.managementStatus === 'GREEN').length;
-    return { active, mrr, healthy };
+    return { active, mrr, projects, healthy };
   }, [clients]);
 
   const updateClientStatus = async (clientId: string, status: ManagementFlag) => {
@@ -94,25 +103,33 @@ export function Management() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <KPICard 
-          label="Receita Mensal (MRR)" 
+          label="Recorrência (MRR)" 
           value={stats.mrr} 
           isCurrency 
           icon={<DollarSign size={20} className="text-accent-mint" />}
           color="accent-mint"
         />
         <KPICard 
-          label="Contratos Ativos" 
-          value={stats.active} 
-          icon={<Briefcase size={20} className="text-fuchsia-400" />}
+          label="Projetos Únicos" 
+          value={stats.projects} 
+          isCurrency 
+          icon={<TrendingUp size={20} className="text-blue-400" />}
+          color="blue-400"
+        />
+        <KPICard 
+          label="Total em Carteira" 
+          value={stats.mrr + stats.projects} 
+          isCurrency 
+          icon={<CheckCircle2 size={20} className="text-fuchsia-400" />}
           color="fuchsia-400"
         />
         <KPICard 
-          label="Retenção Saudável" 
+          label="Status Saudável" 
           value={`${Math.round((stats.healthy / stats.active) * 100 || 0)}%`} 
-          icon={<CheckCircle2 size={20} className="text-blue-400" />}
-          color="blue-400"
+          icon={<CheckCircle2 size={20} className="text-white" />}
+          color="white"
         />
       </div>
 
@@ -123,6 +140,7 @@ export function Management() {
               <tr className="bg-white/[0.02] border-b border-white/5 text-[10px] font-bold uppercase tracking-widest text-text-muted">
                 <th className="px-6 py-4">Cliente</th>
                 <th className="px-6 py-4">Dono / Sócios</th>
+                <th className="px-6 py-4">Gestor</th>
                 <th className="px-6 py-4">Valor do Plano</th>
                 <th className="px-6 py-4">Status / Flag</th>
                 <th className="px-6 py-4">Contrato</th>
@@ -134,18 +152,46 @@ export function Management() {
                 <tr key={client.id} className="hover:bg-white/[0.01] transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-black shrink-0" style={{ backgroundColor: client.brandColor }}>
-                        {client.logo ? <img src={client.logo} className="w-full h-full object-cover rounded-lg" alt="" /> : client.name.charAt(0)}
+                      <div className="relative">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-black shrink-0" style={{ backgroundColor: client.brandColor }}>
+                          {client.logo ? <img src={client.logo} className="w-full h-full object-cover rounded-lg" alt="" /> : client.name.charAt(0)}
+                        </div>
+                        {isContentDelayed(client) && (
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent-coral rounded-full border-2 border-bg-base animate-pulse shadow-[0_0_8px_rgba(255,77,77,0.8)]" />
+                        )}
                       </div>
-                      <span className="font-medium text-sm">{client.name}</span>
+                      <div className="flex flex-col">
+                        <span className={cn("font-medium text-sm transition-colors", isContentDelayed(client) ? "text-accent-coral" : "text-white")}>{client.name}</span>
+                        {isContentDelayed(client) && (
+                          <span className="text-[8px] font-bold text-accent-coral uppercase leading-none mt-0.5">Postagem Atrasada</span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-text-secondary italic">
                     {client.ownerNames || 'Não informado'}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">{formatCurrency(client.planValue || 0)}</span>
+                    <span className={cn(
+                      "text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md",
+                      client.accountManager === 'Não tem gestor' ? "bg-accent-coral/10 text-accent-coral border border-accent-coral/20" : "bg-white/5 text-text-secondary"
+                    )}>
+                      {client.accountManager || 'Pendente'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {isVisible ? formatCurrency(client.planValue || 0) : '•••••'}
+                        </span>
+                        <span className={cn(
+                          "text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter",
+                          client.billingModel === 'ONE_OFF' ? "bg-blue-400/10 text-blue-400 border border-blue-400/20" : "bg-accent-mint/10 text-accent-mint border border-accent-mint/20"
+                        )}>
+                          {client.billingModel === 'ONE_OFF' ? 'Projeto' : 'Mensal'}
+                        </span>
+                      </div>
                       <span className="text-[10px] text-text-muted truncate max-w-[150px]">{client.planScope || 'Escopo básico'}</span>
                     </div>
                   </td>
@@ -192,6 +238,7 @@ export function Management() {
 }
 
 function KPICard({ label, value, isCurrency = false, icon, color }: any) {
+  const { isVisible } = useVisibility();
   return (
     <div className="glass p-6 rounded-2xl relative group overflow-hidden">
       <div className="flex items-center justify-between mb-4">
@@ -202,9 +249,9 @@ function KPICard({ label, value, isCurrency = false, icon, color }: any) {
       </div>
       <div className="flex items-baseline gap-1">
         <span className="text-3xl font-medium tracking-tighter">
-          {isCurrency ? formatCurrency(value).replace('R$', '').trim() : value}
+          {isVisible ? (isCurrency ? formatCurrency(value).replace('R$', '').trim() : value) : '•••••'}
         </span>
-        {isCurrency && <span className="text-sm text-text-muted font-bold">BRL</span>}
+        {isVisible && isCurrency && <span className="text-sm text-text-muted font-bold">BRL</span>}
       </div>
       <div className={cn(
         "absolute bottom-0 inset-x-0 h-1 bg-gradient-to-r from-transparent opacity-0 group-hover:opacity-100 transition-opacity",

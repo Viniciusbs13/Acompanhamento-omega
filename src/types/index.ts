@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type BusinessType = 'SERVICE_BOOKING' | 'ECOMMERCE' | 'B2B_LEADS' | 'WHATSAPP' | 'REAL_ESTATE' | 'INFO_PRODUCTS' | 'LOCAL_BUSINESS';
+export type BusinessType = 'SERVICE_BOOKING' | 'ECOMMERCE' | 'B2B_LEADS' | 'WHATSAPP' | 'REAL_ESTATE' | 'INFO_PRODUCTS' | 'LOCAL_BUSINESS' | 'VIDEO_PRODUCTION' | 'CONTENT_EDITING' | 'LAUNCH';
+
+export type BillingModel = 'RECURRING' | 'ONE_OFF';
 
 export type StatusHealth = 'GOOD' | 'WARNING' | 'CRITICAL';
 
@@ -43,24 +45,44 @@ export interface Client {
   planScope?: string;
   contractUrl?: string;
   managementStatus?: ManagementFlag;
+  billingModel?: BillingModel;
+  performanceMode?: 'LEADS' | 'SALES';
+  strategyUrl?: string;
+  contentPlan?: {
+    total: number;
+    items: {
+      id: string;
+      targetDate: string;
+      status: 'PLANNED' | 'POSTED';
+    }[];
+  };
+  captures?: {
+    id: string;
+    date: string;
+    title: string;
+    status: 'PLANNED' | 'DONE';
+  }[];
 }
 
 export interface MetricEntry {
   id: string;
   clientId: string;
-  date: string; // ISO String (usually first day of month)
+  date: string; // ISO String (start or exact day)
+  endDate?: string; // For date ranges
   
   // Input fields (common)
   investment: number;
+  revenue?: number;
+  profit?: number;
+  leads?: number;
+  sales?: number;
+  clicks?: number;
+  cpm?: number;
   
   // Specific to SERVICE_BOOKING
-  leads?: number;
   bookings?: number;
   shows?: number;
-  sales?: number;
-  revenue?: number;
-  profit?: number; // New field
-  cac?: number;    // New field for direct input if needed
+  cac?: number;
 
   // Specific to ECOMMERCE
   sessions?: number;
@@ -77,6 +99,10 @@ export interface MetricEntry {
   waClicks?: number;
   waConversations?: number;
   qualifiedLeads?: number;
+  // Specific to creative types
+  delivered?: number;
+  projects?: number;
+  raw?: number;
   customData?: Record<string, number>;
 }
 
@@ -87,9 +113,16 @@ export interface CalculatedMetrics {
   conversion: number;
   profit?: number;
   roi?: number;
+  delivered?: number;
+  projects?: number;
+  leads?: number;
+  sales?: number;
   // Specifics
   cpl?: number;
   cpc?: number;
+  cpm?: number;
+  clicks?: number;
+  ctr?: number;
   bookingRate?: number;
   showRate?: number;
   closeRate?: number;

@@ -10,7 +10,9 @@ import {
   LogOut,
   ChevronRight,
   Bell,
-  Briefcase
+  Briefcase,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { cn } from '../lib/utils';
@@ -18,6 +20,7 @@ import { storage } from '../lib/storage';
 import { motion, AnimatePresence } from 'motion/react';
 import { CommandPalette } from './CommandPalette';
 import { useAuth } from '../contexts/AuthContext';
+import { useVisibility } from '../contexts/VisibilityContext';
 import { toast } from 'sonner';
 
 export function Layout() {
@@ -25,6 +28,7 @@ export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { isVisible, toggleVisibility } = useVisibility();
   const [settings, setSettings] = useState<any>(null);
 
   useEffect(() => {
@@ -140,6 +144,14 @@ export function Layout() {
               <Plus size={16} />
               <span className="hidden sm:inline">Novo Lançamento</span>
             </Link>
+            <button 
+              onClick={toggleVisibility}
+              className="p-2 text-text-secondary hover:text-white transition-colors"
+              title={isVisible ? "Esconder valores" : "Mostrar valores"}
+            >
+              {isVisible ? <Eye size={20} /> : <EyeOff size={20} />}
+            </button>
+
             <div className="w-px h-8 bg-border-subtle mx-2" />
             <button className="p-2 text-text-secondary hover:text-white relative">
               <Bell size={20} />

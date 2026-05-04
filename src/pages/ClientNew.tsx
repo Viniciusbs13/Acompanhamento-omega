@@ -1,11 +1,25 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Building2, ShoppingCart, Briefcase, MessageSquare, ChevronRight, ChevronLeft, Check, Plus, Trash2, Camera } from 'lucide-react';
-import { useForm } from 'react-hook-form';
+import { 
+  Building2, 
+  ShoppingCart, 
+  Briefcase, 
+  MessageSquare, 
+  ChevronRight, 
+  ChevronLeft, 
+  Check, 
+  Plus, 
+  Trash2, 
+  Camera,
+  FileText,
+  CheckCircle2,
+  TrendingUp
+} from 'lucide-react';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { BusinessType, Client } from '../types';
+import { BusinessType, Client, BillingModel } from '../types';
 import { storage } from '../lib/storage';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
@@ -24,6 +38,20 @@ const schema = z.object({
   planValue: z.number().min(0).default(0),
   planScope: z.string().optional(),
   contractUrl: z.string().optional(),
+  strategyUrl: z.string().optional(),
+  contentTotal: z.number().min(0).default(0),
+  contentItems: z.array(z.object({
+    id: z.string(),
+    targetDate: z.string(),
+    status: z.enum(['PLANNED', 'POSTED']).default('PLANNED'),
+  })).default([]),
+  captures: z.array(z.object({
+    id: z.string(),
+    date: z.string(),
+    title: z.string(),
+    status: z.enum(['PLANNED', 'DONE']).default('PLANNED'),
+  })).default([]),
+  billingModel: z.enum(['RECURRING', 'ONE_OFF']).default('RECURRING'),
 });
 
 export function ClientNew() {
@@ -53,7 +81,7 @@ export function ClientNew() {
     }
   };
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const { register, handleSubmit, control, setValue, getValues, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       brandColor: '#00D9A3',
@@ -63,8 +91,14 @@ export function ClientNew() {
       durationMonths: 6,
       adSpend: 0,
       ticket: 0,
+      billingModel: 'RECURRING',
+      contentTotal: 0,
+      contentItems: [],
+      captures: []
     }
   });
+
+  const watchBillingModel = useWatch({ control, name: 'billingModel' });
 
   const onFormError = (errors: any) => {
     console.error('Erros de validação:', errors);
@@ -106,7 +140,14 @@ export function ClientNew() {
         planValue: data.planValue,
         planScope: data.planScope,
         contractUrl: data.contractUrl,
+        strategyUrl: data.strategyUrl,
+        contentPlan: {
+          total: data.contentTotal,
+          items: data.contentItems || []
+        },
+        captures: data.captures || [],
         managementStatus: 'GREEN',
+        billingModel: data.billingModel,
       };
 
       console.log('Tentando salvar cliente:', newClient);
@@ -138,6 +179,9 @@ export function ClientNew() {
     { id: 'REAL_ESTATE', icon: Building2, label: 'Imobiliária', desc: 'Venda e aluguel de imóveis, lançamentos' },
     { id: 'LOCAL_BUSINESS', icon: ShoppingCart, label: 'Negócio Local', desc: 'Lanchonetes, lojas físicas, farmácias' },
     { id: 'WHATSAPP', icon: MessageSquare, label: 'WhatsApp / Direto', desc: 'Vendas via chat, delivery' },
+    { id: 'LAUNCH', icon: TrendingUp, label: 'Lançamento', desc: 'Infoprodutos, eventos, promoções sazonais' },
+    { id: 'VIDEO_PRODUCTION', icon: Camera, label: 'Produção de Vídeo', desc: 'Gravação e direção de vídeos' },
+    { id: 'CONTENT_EDITING', icon: Briefcase, label: 'Edição de Vídeo/Posts', desc: 'Edição de reels, shorts, criativos' },
   ];
 
   const defaultFunnels: Record<string, { id: string, label: string }[]> = {
@@ -174,6 +218,22 @@ export function ClientNew() {
        { id: 'waClicks', label: 'Cliques' },
        { id: 'waConversations', label: 'Conversas' },
        { id: 'sales', label: 'Vendas' }
+    ],
+    LAUNCH: [
+       { id: 'leads', label: 'Leads' },
+       { id: 'sales', label: 'Vendas' },
+       { id: 'clicks', label: 'Cliques' },
+       { id: 'cpm', label: 'CPM' }
+    ],
+    VIDEO_PRODUCTION: [
+      { id: 'projects', label: 'Pautas/Projetos' },
+      { id: 'recording', label: 'Gravações' },
+      { id: 'delivered', label: 'Entregues' }
+    ],
+    CONTENT_EDITING: [
+      { id: 'raw', label: 'Brutos Recebidos' },
+      { id: 'editing', label: 'Em Edição' },
+      { id: 'delivered', label: 'Entregues' }
     ]
   };
 
@@ -273,7 +333,22 @@ export function ClientNew() {
                       {errors.name && <p className="text-accent-coral text-[10px] mt-1 font-bold">{errors.name.message as string}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Gestor Responsável</label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-bold uppercase tracking-widest text-text-muted">Gestor Responsável</label>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            const input = document.querySelector('input[name="accountManager"]') as HTMLInputElement;
+                            if (input) {
+                              input.value = "Não";
+                              input.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                          }}
+                          className="text-[9px] font-bold text-accent-mint hover:underline uppercase"
+                        >
+                          Sem gestor (Não)
+                        </button>
+                      </div>
                       <input 
                         {...register('accountManager')}
                         placeholder="Nome do gestor"
@@ -450,6 +525,29 @@ export function ClientNew() {
               className="space-y-6"
             >
               <h2 className="text-xl font-medium">Gestão e Contrato</h2>
+              
+              <div className="glass p-6 rounded-2xl space-y-4">
+                <label className="block text-xs font-bold uppercase tracking-widest text-text-muted">Modelo de Faturamento</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <label className={cn(
+                    "p-4 rounded-xl border-2 cursor-pointer transition-all flex flex-col items-center gap-2",
+                    watchBillingModel === 'RECURRING' ? "border-accent-mint bg-accent-mint/5" : "border-white/5 hover:bg-white/5"
+                  )}>
+                    <input type="radio" value="RECURRING" {...register('billingModel')} className="sr-only" />
+                    <CheckCircle2 size={24} className={watchBillingModel === 'RECURRING' ? "text-accent-mint" : "text-text-muted"} />
+                    <span className="text-sm font-bold uppercase tracking-wider">Recorrência (MRR)</span>
+                  </label>
+                  <label className={cn(
+                    "p-4 rounded-xl border-2 cursor-pointer transition-all flex flex-col items-center gap-2",
+                    watchBillingModel === 'ONE_OFF' ? "border-accent-mint bg-accent-mint/5" : "border-white/5 hover:bg-white/5"
+                  )}>
+                    <input type="radio" value="ONE_OFF" {...register('billingModel')} className="sr-only" />
+                    <FileText size={24} className={watchBillingModel === 'ONE_OFF' ? "text-accent-mint" : "text-text-muted"} />
+                    <span className="text-sm font-bold uppercase tracking-wider">Projeto Único</span>
+                  </label>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Nome dos Donos/Sócios</label>
@@ -460,7 +558,7 @@ export function ClientNew() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Valor Mensal do Plano (BRL)</label>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Valor Total {watchBillingModel === 'RECURRING' ? 'do Plano (BRL)' : 'do Projeto (BRL)'}</label>
                   <input 
                     type="number"
                     {...register('planValue', { valueAsNumber: true })}
@@ -478,13 +576,154 @@ export function ClientNew() {
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium resize-none"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Link do Contrato Assinado</label>
-                <input 
-                  {...register('contractUrl')}
-                  placeholder="https://link-do-contrato.com"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Link da Estratégia</label>
+                  <input 
+                    {...register('strategyUrl')}
+                    placeholder="https://link-da-estrategia.com"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Link do Contrato Assinado</label>
+                  <input 
+                    {...register('contractUrl')}
+                    placeholder="https://link-do-contrato.com"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="glass p-6 rounded-2xl space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-white/50">Datas de Captação / Gravação</h3>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const currentItems = getValues('captures') || [];
+                      const today = new Date();
+                      setValue('captures', [
+                        ...currentItems, 
+                        { id: Math.random().toString(36).substring(7), date: today.toISOString().split('T')[0], title: 'Captação', status: 'PLANNED' }
+                      ]);
+                    }}
+                    className="flex items-center gap-2 text-fuchsia-400 text-[10px] font-bold uppercase hover:underline"
+                  >
+                    <Plus size={14} /> Adicionar Captação
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  {(useWatch({ control, name: 'captures' }) || []).map((item: any, idx: number) => (
+                    <div key={item.id} className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5 group">
+                      <div className="w-8 h-8 rounded-full bg-fuchsia-400/10 text-fuchsia-400 flex items-center justify-center text-xs font-bold">
+                        <Camera size={14} />
+                      </div>
+                      <div className="flex-1 grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Título/Obs</label>
+                          <input 
+                            type="text"
+                            defaultValue={item.title}
+                            onChange={(e) => {
+                              const current = getValues('captures');
+                              current[idx].title = e.target.value;
+                              setValue('captures', [...current]);
+                            }}
+                            placeholder="Ex: Gravação de Reels"
+                            className="bg-transparent text-sm font-medium outline-none text-white w-full border-b border-white/10 focus:border-fuchsia-400 transition-colors"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Data</label>
+                          <input 
+                            type="date"
+                            defaultValue={item.date}
+                            onChange={(e) => {
+                              const current = getValues('captures');
+                              current[idx].date = e.target.value;
+                              setValue('captures', [...current]);
+                            }}
+                            className="bg-transparent text-sm font-medium outline-none text-white w-full"
+                          />
+                        </div>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const current = getValues('captures').filter((_: any, i: number) => i !== idx);
+                          setValue('captures', [...current]);
+                        }}
+                        className="p-2 text-text-muted hover:text-accent-coral opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="glass p-6 rounded-2xl space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-white/50">Planejamento de Conteúdo Mensal</h3>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const currentItems = getValues('contentItems') || [];
+                      const nextWeek = new Date();
+                      nextWeek.setDate(nextWeek.getDate() + (currentItems.length * 7));
+                      setValue('contentItems', [
+                        ...currentItems, 
+                        { id: Math.random().toString(36).substring(7), targetDate: nextWeek.toISOString().split('T')[0], status: 'PLANNED' }
+                      ]);
+                      setValue('contentTotal', currentItems.length + 1);
+                    }}
+                    className="flex items-center gap-2 text-accent-mint text-[10px] font-bold uppercase hover:underline"
+                  >
+                    <Plus size={14} /> Adicionar Vídeo p/ Semana
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  {(useWatch({ control, name: 'contentItems' }) || []).map((item: any, idx: number) => (
+                    <div key={item.id} className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5 group">
+                      <div className="w-8 h-8 rounded-full bg-accent-mint/10 text-accent-mint flex items-center justify-center text-xs font-bold">
+                        {idx + 1}
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Data de Postagem</label>
+                        <input 
+                          type="date"
+                          defaultValue={item.targetDate}
+                          onChange={(e) => {
+                            const current = getValues('contentItems');
+                            current[idx].targetDate = e.target.value;
+                            setValue('contentItems', [...current]);
+                          }}
+                          className="bg-transparent text-sm font-medium outline-none text-white w-full"
+                        />
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const current = getValues('contentItems').filter((_: any, i: number) => i !== idx);
+                          setValue('contentItems', [...current]);
+                          setValue('contentTotal', current.length);
+                        }}
+                        className="p-2 text-text-muted hover:text-accent-coral opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {(getValues('contentItems')?.length || 0) === 0 && (
+                    <div className="py-8 text-center border-2 border-dashed border-white/5 rounded-2xl">
+                      <p className="text-xs text-text-muted">Nenhum conteúdo agendado. Clique em "Adicionar" para definir as pautas.</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </motion.div>
           )}
@@ -495,7 +734,13 @@ export function ClientNew() {
           <button
             type="button"
             disabled={step === 1}
-            onClick={() => setStep(s => s - 1)}
+            onClick={() => {
+              if (step === 4 && (selectedType === 'VIDEO_PRODUCTION' || selectedType === 'CONTENT_EDITING')) {
+                setStep(2);
+              } else {
+                setStep(s => s - 1);
+              }
+            }}
             className="flex items-center gap-2 px-6 py-3 rounded-xl text-text-secondary hover:text-white disabled:opacity-0 transition-all font-medium"
           >
             <ChevronLeft size={20} />
@@ -506,8 +751,11 @@ export function ClientNew() {
             <button
               type="button"
               onClick={() => {
-                if (step === 1 && !step1ValuesAreValid()) return; // Manual check if needed
-                setStep(s => s + 1);
+                if (step === 2 && (selectedType === 'VIDEO_PRODUCTION' || selectedType === 'CONTENT_EDITING')) {
+                  setStep(4);
+                } else {
+                  setStep(s => s + 1);
+                }
               }}
               className="px-8 py-3 bg-white text-black font-semibold rounded-xl hover:bg-white/90 transition-all flex items-center gap-2"
             >
