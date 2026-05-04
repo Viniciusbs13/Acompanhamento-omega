@@ -18,6 +18,46 @@ import {
 } from 'recharts';
 import { toast } from 'sonner';
 
+const BUSINESS_CONFIGS: Record<string, any> = {
+  REAL_ESTATE: {
+    label: 'Imobiliária',
+    funnel: ['leads', 'bookings', 'sales'],
+    labels: { leads: 'Leads', bookings: 'Visitas', sales: 'Contratos' },
+    hideCac: true,
+    hideProfit: true
+  },
+  INFO_PRODUCTS: {
+    label: 'Infoprodutos',
+    funnel: ['leads', 'sales'],
+    labels: { leads: 'Leads', sales: 'Vendas' }
+  },
+  LOCAL_BUSINESS: {
+    label: 'Negócio Local',
+    funnel: ['leads', 'sales'],
+    labels: { leads: 'Contatos', sales: 'Vendas' }
+  },
+  ECOMMERCE: {
+    label: 'E-commerce',
+    funnel: ['sessions', 'addCart', 'purchases'],
+    labels: { sessions: 'Sessões', addCart: 'Carrinhos', purchases: 'Vendas' }
+  },
+  SERVICE_BOOKING: {
+    label: 'Serviço com Agendamento',
+    funnel: ['leads', 'bookings', 'shows', 'sales'],
+    labels: { leads: 'Leads', bookings: 'Agendam.', shows: 'Comparec.', sales: 'Vendas' }
+  },
+  B2B_LEADS: {
+    label: 'Captação Leads B2B',
+    funnel: ['leads', 'mqls', 'sales'],
+    labels: { leads: 'Leads', mqls: 'MQLs', sales: 'Vendas' }
+  },
+  WHATSAPP: {
+    label: 'WhatsApp',
+    funnel: ['waClicks', 'waConversations', 'sales'],
+    labels: { waClicks: 'Cliques', waConversations: 'Conversas', sales: 'Vendas' }
+  }
+};
+
 export function ClientDashboard() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -57,20 +97,27 @@ export function ClientDashboard() {
     }
   };
   const { entries, addEntry, removeEntry, loading: loadingEntries } = useEntries(id || '');
-  const [newEntry, setNewEntry] = useState({
+  const [newEntry, setNewEntry] = useState<any>({
     date: new Date().toISOString().substring(0, 7),
     investment: '',
     revenue: '',
     profit: '',
     cac: '',
-    leads: '',
-    bookings: '',
-    shows: '',
-    sales: ''
+    customData: {}
   });
 
   const handleAddField = (field: string, value: string) => {
-    setNewEntry(prev => ({ ...prev, [field]: value }));
+    setNewEntry((prev: any) => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddCustomField = (id: string, value: string) => {
+    setNewEntry((prev: any) => ({
+      ...prev,
+      customData: {
+        ...(prev.customData || {}),
+        [id]: value
+      }
+    }));
   };
 
   const handleSaveEntry = async () => {
@@ -81,6 +128,14 @@ export function ClientDashboard() {
 
     const toastId = toast.loading("Salvando lançamento...");
     try {
+      // Process custom data strings to numbers
+      const processedCustomData: Record<string, number> = {};
+      if (newEntry.customData) {
+        Object.entries(newEntry.customData).forEach(([key, val]) => {
+          processedCustomData[key] = parseInt(val as string) || 0;
+        });
+      }
+
       const entryData = {
         id: Math.random().toString(36).substring(2, 11),
         clientId: id!,
@@ -92,20 +147,18 @@ export function ClientDashboard() {
         leads: parseInt(newEntry.leads) || 0,
         bookings: parseInt(newEntry.bookings) || 0,
         shows: parseInt(newEntry.shows) || 0,
-        sales: parseInt(newEntry.sales) || 0
+        sales: parseInt(newEntry.sales) || 0,
+        customData: processedCustomData
       };
 
-      await addEntry(entryData);
+      await addEntry(entryData as any);
       setNewEntry({
         date: new Date().toISOString().substring(0, 7),
         investment: '',
         revenue: '',
         profit: '',
         cac: '',
-        leads: '',
-        bookings: '',
-        shows: '',
-        sales: ''
+        customData: {}
       });
       toast.success("Lançamento realizado com sucesso!", { id: toastId });
     } catch (error) {
@@ -171,6 +224,15 @@ export function ClientDashboard() {
     }
   };
 
+  const tabs = [
+    { id: 'overview', label: 'Dashboard', icon: BarChart3 },
+    { id: 'entries', label: 'Lançamentos', icon: PlusCircle },
+    { id: 'report', label: 'Relatório', icon: FileText },
+    { id: 'settings', label: 'Configurações', icon: Settings },
+  ];
+
+  const config = useMemo(() => BUSINESS_CONFIGS[client?.businessType] || BUSINESS_CONFIGS.SERVICE_BOOKING, [client?.businessType]);
+
   if (loadingClient || loadingEntries) {
     return (
       <div className="py-32 flex justify-center">
@@ -189,13 +251,6 @@ export function ClientDashboard() {
     );
   }
 
-  const tabs = [
-    { id: 'overview', label: 'Dashboard', icon: BarChart3 },
-    { id: 'entries', label: 'Lançamentos', icon: PlusCircle },
-    { id: 'report', label: 'Relatório', icon: FileText },
-    { id: 'settings', label: 'Configurações', icon: Settings },
-  ];
-
   return (
     <div 
       ref={containerRef}
@@ -213,7 +268,7 @@ export function ClientDashboard() {
             </div>
             <div>
               <h2 className="text-xl font-medium">{client!.name}</h2>
-              <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">Dashboard de Performance</p>
+              <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">Dashboard de Performance | {config.label}</p>
             </div>
           </div>
           <button 
@@ -246,7 +301,7 @@ export function ClientDashboard() {
               <HealthBadge status={health} />
             </div>
             <div className="flex items-center gap-4 text-sm text-text-secondary">
-               <span className="bg-white/5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest">{client.businessType}</span>
+               <span className="bg-white/5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest">{config.label}</span>
                {client.accountManager && (
                  <span className="flex items-center gap-1.5"><Users size={14} /> Gestor: {client.accountManager}</span>
                )}
@@ -308,8 +363,8 @@ export function ClientDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <ClientKPICard label="Faturamento" value={lastEntry?.revenue || 0} isCurrency trend={metrics && previousMetrics ? ((metrics.roas / previousMetrics.roas - 1) * 100) : 0} />
               <ClientKPICard label="Investimento" value={lastEntry?.investment || 0} isCurrency />
-              <ClientKPICard label="Lucro" value={lastEntry?.profit || 0} isCurrency color="text-accent-mint" />
-              <ClientKPICard label="CAC" value={metrics?.cac || 0} isCurrency color="text-accent-coral" />
+              {!config.hideProfit && <ClientKPICard label="Lucro" value={lastEntry?.profit || 0} isCurrency color="text-accent-mint" />}
+              {!config.hideCac && <ClientKPICard label="CAC" value={metrics?.cac || 0} isCurrency color="text-accent-coral" />}
               <ClientKPICard label="ROAS" value={metrics?.roas || 0} isDecimal />
             </div>
 
@@ -348,7 +403,7 @@ export function ClientDashboard() {
               <div className="glass rounded-3xl p-8 flex flex-col">
                  <h3 className="font-medium text-lg mb-8">Funil de Conversão</h3>
                  <div className="flex-1">
-                   {metrics ? <ConversionFunnelVisual entry={lastEntry} type={client.businessType} metrics={metrics} /> : <div className="h-full flex items-center justify-center text-text-muted">Aguardando dados...</div>}
+                   {metrics ? <ConversionFunnelVisual entry={lastEntry} client={client} metrics={metrics} /> : <div className="h-full flex items-center justify-center text-text-muted">Aguardando dados...</div>}
                  </div>
               </div>
             </div>
@@ -444,66 +499,72 @@ export function ClientDashboard() {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Lucro (BRL)</label>
-                  <input 
-                    type="number" 
-                    value={newEntry.profit}
-                    onChange={(e) => handleAddField('profit', e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
-                    placeholder="0.00" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">CAC (Manual opcional)</label>
-                  <input 
-                    type="number" 
-                    value={newEntry.cac}
-                    onChange={(e) => handleAddField('cac', e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
-                    placeholder="0.00" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Leads</label>
-                  <input 
-                    type="number" 
-                    value={newEntry.leads}
-                    onChange={(e) => handleAddField('leads', e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
-                    placeholder="0" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Agendamentos</label>
-                  <input 
-                    type="number" 
-                    value={newEntry.bookings}
-                    onChange={(e) => handleAddField('bookings', e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
-                    placeholder="0" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Comparecimentos</label>
-                  <input 
-                    type="number" 
-                    value={newEntry.shows}
-                    onChange={(e) => handleAddField('shows', e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
-                    placeholder="0" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Vendas Totais</label>
-                  <input 
-                    type="number" 
-                    value={newEntry.sales}
-                    onChange={(e) => handleAddField('sales', e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
-                    placeholder="0" 
-                  />
-                </div>
+                {!config.hideProfit && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">Lucro (BRL)</label>
+                    <input 
+                      type="number" 
+                      value={newEntry.profit}
+                      onChange={(e) => handleAddField('profit', e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
+                      placeholder="0.00" 
+                    />
+                  </div>
+                )}
+                {!config.hideCac && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">CAC (Manual opcional)</label>
+                    <input 
+                      type="number" 
+                      value={newEntry.cac}
+                      onChange={(e) => handleAddField('cac', e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
+                      placeholder="0.00" 
+                    />
+                  </div>
+                )}
+
+                {/* Dynamic Fields based on config.funnel or custom funnel */}
+                {client.customFunnelSteps && client.customFunnelSteps.length > 0 ? (
+                   client.customFunnelSteps.map((stepItem: any) => {
+                     // Check if it's a standard field or customData field
+                     const isStandard = ['leads', 'bookings', 'shows', 'sales', 'sessions', 'addCart', 'purchases', 'mqls', 'waClicks', 'waConversations'].includes(stepItem.id);
+                     return (
+                       <div key={stepItem.id} className="space-y-2">
+                         <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                           {stepItem.label}
+                         </label>
+                         <input 
+                           type="number" 
+                           value={isStandard ? (newEntry[stepItem.id] || '') : (newEntry.customData?.[stepItem.id] || '')}
+                           onChange={(e) => isStandard ? handleAddField(stepItem.id, e.target.value) : handleAddCustomField(stepItem.id, e.target.value)}
+                           className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
+                           placeholder="0" 
+                         />
+                       </div>
+                     );
+                   })
+                ) : (
+                  config.funnel.map((field: string) => {
+                    // Skip investment/revenue as they are in the row above
+                    if (['investment', 'revenue', 'sessions', 'profit'].includes(field)) return null;
+                    
+                    return (
+                      <div key={field} className="space-y-2">
+                        <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                          {config.labels[field] || field}
+                        </label>
+                        <input 
+                          type="number" 
+                          value={(newEntry as any)[field] || ''}
+                          onChange={(e) => handleAddField(field, e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 outline-none" 
+                          placeholder="0" 
+                        />
+                      </div>
+                    );
+                  })
+                )}
               </div>
               <div className="mt-8 flex justify-end">
                 <button 
@@ -659,30 +720,131 @@ export function ClientDashboard() {
                   name: formData.get('name') as string,
                   accountManager: formData.get('accountManager') as string,
                   brandColor: formData.get('brandColor') as string,
+                  ownerNames: formData.get('ownerNames') as string,
+                  planValue: parseFloat(formData.get('planValue') as string) || 0,
+                  planScope: formData.get('planScope') as string,
+                  contractUrl: formData.get('contractUrl') as string,
+                  managementStatus: formData.get('managementStatus') as string,
                 };
                 await storage.saveClient(updatedClient);
                 toast.success("Configurações atualizadas!");
                 setClient(updatedClient);
               }} className="space-y-6">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Nome da Empresa</label>
-                  <input name="name" defaultValue={client.name} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
-                </div>
-                
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Gestor Responsável</label>
-                  <input name="accountManager" defaultValue={client.accountManager} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Cor da Marca</label>
-                  <div className="flex items-center gap-4">
-                    <input type="color" name="brandColor" defaultValue={client.brandColor} className="w-10 h-10 rounded-lg bg-transparent border-none cursor-pointer" />
-                    <span className="text-sm text-text-secondary">Escolha a cor primária deste dashboard.</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Nome da Empresa</label>
+                    <input name="name" defaultValue={client.name} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Gestor Responsável</label>
+                    <input name="accountManager" defaultValue={client.accountManager} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
                   </div>
                 </div>
 
-                <div className="pt-6 border-t border-white/5 flex justify-end gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <div>
+                      <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Donos / Sócios</label>
+                      <input name="ownerNames" defaultValue={client.ownerNames} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
+                   </div>
+                   <div>
+                      <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Valor do Plano (Mensal)</label>
+                      <input type="number" name="planValue" defaultValue={client.planValue} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
+                   </div>
+                </div>
+
+                <div>
+                   <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Escopo do Plano</label>
+                   <textarea name="planScope" defaultValue={client.planScope} rows={3} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium resize-none" />
+                </div>
+
+                <div>
+                   <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Link do Contrato</label>
+                   <input name="contractUrl" defaultValue={client.contractUrl} placeholder="https://..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                   <div>
+                      <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Cor da Marca</label>
+                      <div className="flex items-center gap-4">
+                        <input type="color" name="brandColor" defaultValue={client.brandColor} className="w-10 h-10 rounded-lg bg-transparent border-none cursor-pointer" />
+                        <span className="text-sm text-text-secondary">Cor primária do dashboard.</span>
+                      </div>
+                   </div>
+                   <div>
+                      <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Status de Gestão (Flag)</label>
+                      <select name="managementStatus" defaultValue={client.managementStatus || 'GREEN'} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium">
+                         <option value="GREEN">Saudável (Green Flag)</option>
+                         <option value="YELLOW">Instável (Yellow Flag)</option>
+                         <option value="RED">Crítico (Red Flag)</option>
+                      </select>
+                   </div>
+                </div>
+
+                <div className="pt-6 border-t border-white/5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold uppercase tracking-widest text-text-muted">Funil de Vendas</label>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const newSteps = [...(client.customFunnelSteps || [])];
+                        newSteps.push({ id: `step_${Date.now()}`, label: 'Nova Etapa' });
+                        setClient({ ...client, customFunnelSteps: newSteps });
+                      }}
+                      className="flex items-center gap-2 text-accent-mint text-[10px] font-bold uppercase hover:underline"
+                    >
+                      <Plus size={14} /> Adicionar Etapa
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {(client.customFunnelSteps || []).map((step: any, index: number) => (
+                      <div key={step.id || index} className="flex items-center gap-3">
+                        <div className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-[8px] font-bold text-text-muted">
+                          {index + 1}
+                        </div>
+                        <input 
+                          value={step.label}
+                          onChange={(e) => {
+                            const newSteps = [...client.customFunnelSteps];
+                            newSteps[index] = { ...newSteps[index], label: e.target.value };
+                            setClient({ ...client, customFunnelSteps: newSteps });
+                          }}
+                          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-accent-mint/50"
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            const newSteps = client.customFunnelSteps.filter((_: any, i: number) => i !== index);
+                            setClient({ ...client, customFunnelSteps: newSteps });
+                          }}
+                          className="p-2 text-text-muted hover:text-accent-coral transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                    
+                    {(!client.customFunnelSteps || client.customFunnelSteps.length === 0) && (
+                      <p className="text-xs text-text-muted italic">Usando funil padrão do setor. Adicione etapas para personalizar.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-white/5 flex justify-between items-center">
+                  <button 
+                    type="button"
+                    onClick={async () => {
+                      if (window.confirm("Deseja realmente excluir este cliente e todos os dados vinculados?")) {
+                        await storage.deleteClient(client.id);
+                        toast.success("Cliente removido!");
+                        navigate('/clientes');
+                      }
+                    }}
+                    className="text-accent-coral text-xs font-bold uppercase hover:underline flex items-center gap-2"
+                  >
+                    <Trash2 size={14} /> Excluir Cliente
+                  </button>
                   <button type="submit" className="bg-accent-mint text-black font-bold px-8 py-3 rounded-xl hover:bg-accent-mint/90 transition-all">Salvar Alterações</button>
                 </div>
               </form>
@@ -740,24 +902,66 @@ function SummaryItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ConversionFunnelVisual({ entry, type, metrics }: any) {
+function ConversionFunnelVisual({ entry, client, metrics }: any) {
+  if (!client || !entry || !metrics) return null;
+  const type = client?.businessType;
+  const config = BUSINESS_CONFIGS[type] || BUSINESS_CONFIGS.SERVICE_BOOKING;
+  const customSteps = client?.customFunnelSteps;
+  
   const stages = useMemo(() => {
-    if (type === 'SERVICE_BOOKING') {
-      return [
-        { label: 'Leads', value: entry.leads || 0 },
-        { label: 'Agendamentos', value: entry.bookings || 0, rate: metrics.bookingRate },
-        { label: 'Comparecimentos', value: entry.shows || 0, rate: metrics.showRate },
-        { label: 'Vendas', value: entry.sales || 0, rate: metrics.closeRate }
-      ];
-    }
-    // Simplification for others
-    return [
-      { label: 'Investimento', value: entry.investment },
-      { label: 'Retorno', value: entry.revenue || 0, rate: metrics.roas * 100 }
-    ];
-  }, [entry, type, metrics]);
+    if (customSteps && customSteps.length > 0) {
+      return customSteps.map((step: any, idx: number) => {
+        // Try to find value in standard fields first, then customData
+        const standardFields = ['leads', 'bookings', 'shows', 'sales', 'sessions', 'addCart', 'purchases', 'mqls', 'waClicks', 'waConversations'];
+        let value = 0;
+        if (standardFields.includes(step.id)) {
+          value = entry[step.id] || 0;
+        } else {
+          value = entry.customData?.[step.id] || 0;
+        }
 
-  const maxVal = Math.max(...stages.map(s => s.value), 1);
+        let rate = undefined;
+        // Basic conversion from previous step if available
+        if (idx > 0) {
+          const prevStep = customSteps[idx-1];
+          let prevValue = 0;
+          if (standardFields.includes(prevStep.id)) {
+            prevValue = entry[prevStep.id] || 0;
+          } else {
+            prevValue = entry.customData?.[prevStep.id] || 0;
+          }
+          if (prevValue > 0) rate = (value / prevValue) * 100;
+        }
+
+        return {
+          label: step.label,
+          value,
+          rate
+        };
+      });
+    }
+
+    return config.funnel.map((key: string) => {
+      let value = entry[key] || 0;
+      let rate = undefined;
+      
+      // Calculate rates based on stage
+      if (key === 'bookings') rate = metrics.bookingRate;
+      if (key === 'shows') rate = metrics.showRate;
+      if (key === 'sales' || key === 'purchases') rate = metrics.conversion;
+      if (key === 'waConversations') rate = metrics.waResponseRate;
+      if (key === 'mqls') rate = metrics.mqlRate;
+      if (key === 'addCart') rate = (100 - (metrics.abandonRate || 0));
+
+      return {
+        label: config.labels[key] || key,
+        value,
+        rate
+      };
+    });
+  }, [entry, type, metrics, config, customSteps]);
+
+  const maxVal = Math.max(...stages.map((s: any) => s.value), 1);
 
   return (
     <div className="space-y-6">

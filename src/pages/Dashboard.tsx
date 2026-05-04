@@ -80,6 +80,18 @@ export function Dashboard() {
     fetchData();
   }, []);
 
+  const [selectedCategory, setSelectedCategory] = useState<string>('todos');
+
+  const filteredClients = useMemo(() => {
+    if (selectedCategory === 'todos') return clients;
+    return clients.filter(c => c.businessType === selectedCategory);
+  }, [clients, selectedCategory]);
+
+  const categories = useMemo(() => {
+    const types = Array.from(new Set(clients.map(c => c.businessType)));
+    return ['todos', ...types];
+  }, [clients]);
+
   if (loading) {
     return (
       <div className="py-32 flex justify-center">
@@ -140,21 +152,39 @@ export function Dashboard() {
       </div>
 
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-medium tracking-tight">Performance por Cliente</h2>
-          <Link to="/clientes" className="text-accent-mint font-medium hover:underline text-sm flex items-center gap-1">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h2 className="text-xl font-medium tracking-tight">Performance por Cliente</h2>
+            <div className="flex flex-wrap gap-2 pt-2">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={cn(
+                    "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border",
+                    selectedCategory === cat 
+                      ? "bg-accent-mint border-accent-mint text-black" 
+                      : "bg-white/5 border-white/10 text-text-muted hover:border-white/20"
+                  )}
+                >
+                  {cat === 'todos' ? 'Todos os Setores' : cat.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Link to="/clientes" className="text-accent-mint font-medium hover:underline text-sm flex items-center gap-1 shrink-0">
             Ver carteira completa <ArrowRight size={14} />
           </Link>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {clients.length > 0 ? clients.slice(0, 6).map((client, i) => (
+          {filteredClients.length > 0 ? filteredClients.slice(0, 6).map((client, i) => (
              <GlobalClientCard key={client.id} client={client} index={i} entries={stats.clientEntries[client.id] || []} />
           )) : (
             <div className="col-span-full py-20 flex flex-col items-center justify-center glass rounded-3xl border-dashed">
               <PlusCircle size={40} className="text-text-muted mb-4 opacity-20" />
-              <p className="text-text-secondary font-medium">Você ainda não possui clientes ativos.</p>
-              <Link to="/clientes/novo" className="text-accent-mint text-sm mt-3 font-bold hover:underline">Adicionar meu primeiro cliente</Link>
+              <p className="text-text-secondary font-medium">Nenhum cliente encontrado nesta categoria.</p>
+              <button onClick={() => setSelectedCategory('todos')} className="text-accent-mint text-sm mt-3 font-bold hover:underline">Ver todos os clientes</button>
             </div>
           )}
         </div>
@@ -192,6 +222,9 @@ function KPICard({ label, value, isCurrency = false, variation, icon }: any) {
 function GlobalClientCard({ client, index, entries }: any) {
   const last = entries[entries.length - 1];
   const metrics = last ? calculateMetrics(last, client.businessType) : null;
+  
+  const isRealEstate = client.businessType === 'REAL_ESTATE';
+  const isLocal = client.businessType === 'LOCAL_BUSINESS';
 
   return (
     <motion.div
@@ -205,23 +238,53 @@ function GlobalClientCard({ client, index, entries }: any) {
       >
         <div className="flex items-center gap-4 mb-6">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center text-black font-bold" style={{ backgroundColor: client.brandColor }}>
-            {client.name.charAt(0)}
+            {client.logo ? (
+              <img src={client.logo} alt={client.name} className="w-full h-full object-cover" />
+            ) : (
+              client.name.charAt(0)
+            )}
           </div>
           <div>
             <h4 className="font-medium group-hover:text-accent-mint transition-colors">{client.name}</h4>
-            <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">{client.businessType}</p>
+            <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">{client.businessType.replace('_', ' ')}</p>
           </div>
         </div>
         
         <div className="grid grid-cols-2 gap-4">
-           <div className="bg-white/5 p-3 rounded-2xl">
-              <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">ROAS</p>
-              <p className="text-lg font-medium">{metrics ? (metrics.roas || 0).toFixed(2) : '--'}</p>
-           </div>
-           <div className="bg-white/5 p-3 rounded-2xl">
-              <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">FATURAMENTO</p>
-              <p className="text-lg font-medium tracking-tight text-white/90">{last ? formatCurrency(last.revenue || 0).replace('R$', '').trim() : '--'}</p>
-           </div>
+           {isRealEstate ? (
+             <>
+               <div className="bg-white/5 p-3 rounded-2xl">
+                  <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">LEADS</p>
+                  <p className="text-lg font-medium">{last?.leads || 0}</p>
+               </div>
+               <div className="bg-white/5 p-3 rounded-2xl">
+                  <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">VISITAS</p>
+                  <p className="text-lg font-medium">{last?.bookings || 0}</p>
+               </div>
+             </>
+           ) : isLocal ? (
+             <>
+               <div className="bg-white/5 p-3 rounded-2xl">
+                  <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">CONTATOS</p>
+                  <p className="text-lg font-medium">{last?.leads || 0}</p>
+               </div>
+               <div className="bg-white/5 p-3 rounded-2xl">
+                  <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">VENDAS</p>
+                  <p className="text-lg font-medium">{last?.sales || 0}</p>
+               </div>
+             </>
+           ) : (
+             <>
+               <div className="bg-white/5 p-3 rounded-2xl">
+                  <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">ROAS</p>
+                  <p className="text-lg font-medium">{metrics ? (metrics.roas || 0).toFixed(2) : '--'}</p>
+               </div>
+               <div className="bg-white/5 p-3 rounded-2xl">
+                  <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">FATURAMENTO</p>
+                  <p className="text-lg font-medium tracking-tight text-white/90">{last ? formatCurrency(last.revenue || 0).replace('R$', '').trim() : '--'}</p>
+               </div>
+             </>
+           )}
         </div>
 
         <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">

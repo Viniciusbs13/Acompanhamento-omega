@@ -9,7 +9,8 @@ import {
   Plus, 
   LogOut,
   ChevronRight,
-  Bell
+  Bell,
+  Briefcase
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { cn } from '../lib/utils';
@@ -47,6 +48,7 @@ export function Layout() {
   const navItems = [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Clientes', icon: Users, path: '/clientes' },
+    { label: 'Gestão de Carteira', icon: Briefcase, path: '/gestao' },
     { label: 'Relatórios', icon: FileText, path: '/relatorios' },
     { label: 'Configurações', icon: Settings, path: '/configuracoes' },
   ];

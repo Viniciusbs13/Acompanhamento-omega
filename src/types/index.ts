@@ -3,9 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type BusinessType = 'SERVICE_BOOKING' | 'ECOMMERCE' | 'B2B_LEADS' | 'WHATSAPP';
+export type BusinessType = 'SERVICE_BOOKING' | 'ECOMMERCE' | 'B2B_LEADS' | 'WHATSAPP' | 'REAL_ESTATE' | 'INFO_PRODUCTS' | 'LOCAL_BUSINESS';
 
 export type StatusHealth = 'GOOD' | 'WARNING' | 'CRITICAL';
+
+export type ManagementFlag = 'GREEN' | 'YELLOW' | 'RED';
 
 export interface SmartGoal {
   currentRevenue: number;
@@ -19,6 +21,11 @@ export interface SmartGoal {
   ticket: number;
 }
 
+export interface FunnelStep {
+  id: string;
+  label: string;
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -29,6 +36,13 @@ export interface Client {
   smartGoal: SmartGoal;
   channels: string[];
   createdAt: string;
+  customFunnelSteps?: FunnelStep[];
+  // Management fields
+  ownerNames?: string;
+  planValue?: number;
+  planScope?: string;
+  contractUrl?: string;
+  managementStatus?: ManagementFlag;
 }
 
 export interface MetricEntry {
@@ -63,6 +77,7 @@ export interface MetricEntry {
   waClicks?: number;
   waConversations?: number;
   qualifiedLeads?: number;
+  customData?: Record<string, number>;
 }
 
 export interface CalculatedMetrics {
@@ -81,6 +96,7 @@ export interface CalculatedMetrics {
   mqlRate?: number;
   waResponseRate?: number;
   abandonRate?: number;
+  customRates?: Record<string, number>;
 }
 
 export interface UserSettings {

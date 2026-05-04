@@ -84,6 +84,46 @@ export const calculateMetrics = (entry: MetricEntry, type: BusinessType): Calcul
       metrics.waResponseRate = clicks > 0 ? safeDiv(convs, clicks) * 100 : 0;
       break;
     }
+
+    case 'REAL_ESTATE': {
+      const revenue = entry.revenue || 0;
+      const sales = entry.sales || 0;
+      const leads = entry.leads || 0;
+      const bookings = entry.bookings || 0; // Agendamentos de visita
+
+      metrics.roas = safeDiv(revenue, invest);
+      metrics.cac = sales > 0 ? safeDiv(invest, sales) : 0;
+      metrics.ticket = sales > 0 ? safeDiv(revenue, sales) : 0;
+      metrics.conversion = leads > 0 ? safeDiv(sales, leads) * 100 : 0;
+      metrics.cpl = safeDiv(invest, leads);
+      metrics.bookingRate = leads > 0 ? safeDiv(bookings, leads) * 100 : 0;
+      break;
+    }
+
+    case 'INFO_PRODUCTS': {
+      const revenue = entry.revenue || 0;
+      const sales = entry.sales || 0;
+      const leads = entry.leads || 0;
+
+      metrics.roas = safeDiv(revenue, invest);
+      metrics.cac = sales > 0 ? safeDiv(invest, sales) : 0;
+      metrics.ticket = sales > 0 ? safeDiv(revenue, sales) : 0;
+      metrics.conversion = leads > 0 ? safeDiv(sales, leads) * 100 : 0;
+      metrics.cpl = safeDiv(invest, leads);
+      break;
+    }
+
+    case 'LOCAL_BUSINESS': {
+      const revenue = entry.revenue || 0;
+      const sales = entry.sales || 0;
+      const leads = entry.leads || 0; // Cliques no botão de direção/whatsapp
+
+      metrics.roas = safeDiv(revenue, invest);
+      metrics.cac = sales > 0 ? safeDiv(invest, sales) : 0;
+      metrics.ticket = sales > 0 ? safeDiv(revenue, sales) : 0;
+      metrics.cpl = safeDiv(invest, leads);
+      break;
+    }
   }
 
   metrics.roi = invest > 0 ? safeDiv((entry.revenue || 0) - invest, invest) * 100 : 0;

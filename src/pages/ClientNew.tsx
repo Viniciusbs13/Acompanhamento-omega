@@ -20,6 +20,10 @@ const schema = z.object({
   durationMonths: z.number().min(1).default(6),
   adSpend: z.number().min(0).default(0),
   ticket: z.number().min(0).default(0),
+  ownerNames: z.string().optional(),
+  planValue: z.number().min(0).default(0),
+  planScope: z.string().optional(),
+  contractUrl: z.string().optional(),
 });
 
 export function ClientNew() {
@@ -27,6 +31,7 @@ export function ClientNew() {
   const [selectedType, setSelectedType] = useState<BusinessType>('SERVICE_BOOKING');
   const [channels, setChannels] = useState<string[]>(['Meta Ads', 'Google Ads']);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  const [customFunnelSteps, setCustomFunnelSteps] = useState<{ id: string, label: string }[]>([]);
   const navigate = useNavigate();
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,6 +101,12 @@ export function ClientNew() {
         },
         channels: channels,
         createdAt: new Date().toISOString(),
+        customFunnelSteps: customFunnelSteps,
+        ownerNames: data.ownerNames,
+        planValue: data.planValue,
+        planScope: data.planScope,
+        contractUrl: data.contractUrl,
+        managementStatus: 'GREEN',
       };
 
       console.log('Tentando salvar cliente:', newClient);
@@ -122,9 +133,68 @@ export function ClientNew() {
   const businessTypes = [
     { id: 'SERVICE_BOOKING', icon: Building2, label: 'Serviço com Agendamento', desc: 'Clínicas, consultórios, advogados' },
     { id: 'ECOMMERCE', icon: ShoppingCart, label: 'E-commerce', desc: 'Lojas online com checkout direto' },
-    { id: 'B2B_LEADS', icon: Briefcase, label: 'Captação Leads B2B', desc: 'Consultorias, infoprodutos high-ticket' },
-    { id: 'WHATSAPP', icon: MessageSquare, label: 'WhatsApp / Direto', desc: 'Comércios locais, pequenos serviços' },
+    { id: 'INFO_PRODUCTS', icon: ShoppingCart, label: 'Infoprodutos', desc: 'Cursos online, comunidades, mentorias' },
+    { id: 'B2B_LEADS', icon: Briefcase, label: 'Captação Leads B2B', desc: 'Consultorias, serviços corporativos' },
+    { id: 'REAL_ESTATE', icon: Building2, label: 'Imobiliária', desc: 'Venda e aluguel de imóveis, lançamentos' },
+    { id: 'LOCAL_BUSINESS', icon: ShoppingCart, label: 'Negócio Local', desc: 'Lanchonetes, lojas físicas, farmácias' },
+    { id: 'WHATSAPP', icon: MessageSquare, label: 'WhatsApp / Direto', desc: 'Vendas via chat, delivery' },
   ];
+
+  const defaultFunnels: Record<string, { id: string, label: string }[]> = {
+    SERVICE_BOOKING: [
+      { id: 'leads', label: 'Leads' },
+      { id: 'bookings', label: 'Agendamentos' },
+      { id: 'shows', label: 'Comparecimentos' },
+      { id: 'sales', label: 'Vendas' }
+    ],
+    ECOMMERCE: [
+       { id: 'sessions', label: 'Sessões' },
+       { id: 'addCart', label: 'Carrinhos' },
+       { id: 'purchases', label: 'Vendas' }
+    ],
+    INFO_PRODUCTS: [
+      { id: 'leads', label: 'Leads' },
+      { id: 'sales', label: 'Vendas' }
+    ],
+    B2B_LEADS: [
+      { id: 'leads', label: 'Leads' },
+      { id: 'mqls', label: 'MQLs' },
+      { id: 'sales', label: 'Vendas' }
+    ],
+    REAL_ESTATE: [
+      { id: 'leads', label: 'Leads' },
+      { id: 'bookings', label: 'Visitas' },
+      { id: 'sales', label: 'Vendas' }
+    ],
+    LOCAL_BUSINESS: [
+       { id: 'leads', label: 'Contatos' },
+       { id: 'sales', label: 'Vendas' }
+    ],
+    WHATSAPP: [
+       { id: 'waClicks', label: 'Cliques' },
+       { id: 'waConversations', label: 'Conversas' },
+       { id: 'sales', label: 'Vendas' }
+    ]
+  };
+
+  const handleTypeSelect = (type: BusinessType) => {
+    setSelectedType(type);
+    setCustomFunnelSteps(defaultFunnels[type] || []);
+  };
+
+  const addFunnelStep = () => {
+    setCustomFunnelSteps([...customFunnelSteps, { id: `step_${Date.now()}`, label: 'Nova Etapa' }]);
+  };
+
+  const removeFunnelStep = (index: number) => {
+    setCustomFunnelSteps(customFunnelSteps.filter((_, i) => i !== index));
+  };
+
+  const updateFunnelStep = (index: number, label: string) => {
+    const newSteps = [...customFunnelSteps];
+    newSteps[index].label = label;
+    setCustomFunnelSteps(newSteps);
+  };
 
   const availableChannels = ['Meta Ads', 'Google Ads', 'TikTok Ads', 'LinkedIn Ads', 'Pinterest Ads', 'YouTube Ads'];
 
@@ -137,7 +207,7 @@ export function ClientNew() {
           <p className="text-text-secondary text-sm">Configure o perfil e metas estratégicas.</p>
         </div>
         <div className="flex items-center gap-1">
-          {[1, 2, 3, 4].map(i => (
+          {[1, 2, 3, 4, 5, 6].map(i => (
             <div 
               key={i} 
               className={cn(
@@ -246,7 +316,7 @@ export function ClientNew() {
                       type="radio" 
                       className="sr-only" 
                       checked={selectedType === type.id} 
-                      onChange={() => setSelectedType(type.id as BusinessType)} 
+                      onChange={() => handleTypeSelect(type.id as BusinessType)} 
                     />
                     <type.icon size={32} className={selectedType === type.id ? "text-accent-mint" : "text-text-muted"} />
                     <div>
@@ -321,6 +391,103 @@ export function ClientNew() {
               </div>
             </motion.div>
           )}
+
+          {step === 5 && (
+            <motion.div
+              key="step5"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-medium">Funil de Vendas Personalizado</h2>
+                <button 
+                  type="button"
+                  onClick={addFunnelStep}
+                  className="flex items-center gap-2 text-accent-mint text-sm font-bold hover:underline"
+                >
+                  <Plus size={16} /> Adicionar Etapa
+                </button>
+              </div>
+              
+              <div className="space-y-3">
+                {customFunnelSteps.map((stepItem, index) => (
+                  <div key={stepItem.id} className="flex items-center gap-3 group">
+                    <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-[10px] font-bold text-text-muted">
+                      {index + 1}
+                    </div>
+                    <input 
+                      value={stepItem.label}
+                      onChange={(e) => updateFunnelStep(index, e.target.value)}
+                      className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50"
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => removeFunnelStep(index)}
+                      className="p-2 text-text-muted hover:text-accent-coral opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                ))}
+                
+                {customFunnelSteps.length === 0 && (
+                  <div className="py-8 text-center glass rounded-2xl border-dashed">
+                    <p className="text-text-secondary">Defina as etapas do funil para este cliente.</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {step === 6 && (
+            <motion.div
+              key="step6"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <h2 className="text-xl font-medium">Gestão e Contrato</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Nome dos Donos/Sócios</label>
+                  <input 
+                    {...register('ownerNames')}
+                    placeholder="Ex: João Silva e Maria Oliveira"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Valor Mensal do Plano (BRL)</label>
+                  <input 
+                    type="number"
+                    {...register('planValue', { valueAsNumber: true })}
+                    placeholder="0.00"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">O que está incluso no Plano (Escopo)</label>
+                <textarea 
+                  {...register('planScope')}
+                  placeholder="Ex: Gestão de Meta Ads, 4 campanhas, 1 reunião mensal..."
+                  rows={4}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Link do Contrato Assinado</label>
+                <input 
+                  {...register('contractUrl')}
+                  placeholder="https://link-do-contrato.com"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium"
+                />
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
 
         {/* Footer controls */}
@@ -335,7 +502,7 @@ export function ClientNew() {
             Voltar
           </button>
           
-          {step < 4 ? (
+          {step < 6 ? (
             <button
               type="button"
               onClick={() => {
