@@ -1605,6 +1605,15 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
+  const [selectedRecurringDays, setSelectedRecurringDays] = useState<number[]>([]);
+  
+  useEffect(() => {
+    if (selectedEvent) {
+      setSelectedRecurringDays(selectedEvent.recurringDays || []);
+    } else {
+      setSelectedRecurringDays([]);
+    }
+  }, [selectedEvent, showEventModal]);
   
   const daysInMonth = useMemo(() => {
     const year = currentDate.getFullYear();
@@ -1645,9 +1654,14 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
       client.contentPlan.items.forEach((item: any) => {
         const itemDate = new Date(item.targetDate + "T12:00:00");
         const sameDayOfMonth = date.getDate() === itemDate.getDate();
+        const sameDayOfWeek = item.recurringDays?.includes(date.getDay());
         
-        if (isRecurringClient) {
-          if (sameDayOfMonth) {
+        if (item.isRecurring || (isRecurringClient && !item.recurringDays)) {
+          if (sameDayOfMonth || sameDayOfWeek) {
+            events.push({ type: 'content', ...item });
+          }
+        } else if (item.recurringDays?.length > 0) {
+          if (sameDayOfWeek) {
             events.push({ type: 'content', ...item });
           }
         } else {
@@ -1662,9 +1676,14 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
       client.captures.forEach((cap: any) => {
         const capDate = new Date(cap.date + "T12:00:00");
         const sameDayOfMonth = date.getDate() === capDate.getDate();
+        const sameDayOfWeek = cap.recurringDays?.includes(date.getDay());
         
         if (cap.isRecurring) {
-          if (sameDayOfMonth) {
+          if (sameDayOfMonth || sameDayOfWeek) {
+            events.push({ type: 'capture', ...cap });
+          }
+        } else if (cap.recurringDays?.length > 0) {
+          if (sameDayOfWeek) {
             events.push({ type: 'capture', ...cap });
           }
         } else {
@@ -1679,9 +1698,14 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
       client.meetings.forEach((meeting: any) => {
         const meetDate = new Date(meeting.date + "T12:00:00");
         const sameDayOfMonth = date.getDate() === meetDate.getDate();
+        const sameDayOfWeek = meeting.recurringDays?.includes(date.getDay());
         
         if (meeting.isRecurring) {
-          if (sameDayOfMonth) {
+          if (sameDayOfMonth || sameDayOfWeek) {
+            events.push({ type: 'meeting', ...meeting });
+          }
+        } else if (meeting.recurringDays?.length > 0) {
+          if (sameDayOfWeek) {
             events.push({ type: 'meeting', ...meeting });
           }
         } else {
@@ -1761,17 +1785,17 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
       // Edit mode
       if (selectedEvent.type === 'content') {
         const items = (updatedClient.contentPlan?.items || []).map((i: any) => 
-          i.id === selectedEvent.id ? { ...i, title, notes, targetDate: dateStr } : i
+          i.id === selectedEvent.id ? { ...i, title, notes, targetDate: dateStr, isRecurring, recurringDays: selectedRecurringDays } : i
         );
         updatedClient = { ...updatedClient, contentPlan: { ...(updatedClient.contentPlan || { total: 0 }), items } };
       } else if (selectedEvent.type === 'capture') {
         const captures = (updatedClient.captures || []).map((i: any) => 
-          i.id === selectedEvent.id ? { ...i, title, notes, date: dateStr, isRecurring } : i
+          i.id === selectedEvent.id ? { ...i, title, notes, date: dateStr, isRecurring, recurringDays: selectedRecurringDays } : i
         );
         updatedClient = { ...updatedClient, captures };
       } else if (selectedEvent.type === 'meeting') {
         const meetings = (updatedClient.meetings || []).map((i: any) => 
-          i.id === selectedEvent.id ? { ...i, title, notes, date: dateStr, isRecurring } : i
+          i.id === selectedEvent.id ? { ...i, title, notes, date: dateStr, isRecurring, recurringDays: selectedRecurringDays } : i
         );
         updatedClient = { ...updatedClient, meetings };
       }
@@ -1780,13 +1804,13 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
       const newId = Math.random().toString(36).substring(7);
       if (type === 'content') {
         const currentContentPlan = updatedClient.contentPlan || { total: 0, items: [] };
-        const newItems = [...(currentContentPlan.items || []), { id: newId, targetDate: dateStr, title, notes, status: 'PLANNED' }];
+        const newItems = [...(currentContentPlan.items || []), { id: newId, targetDate: dateStr, title, notes, status: 'PLANNED', isRecurring, recurringDays: selectedRecurringDays }];
         updatedClient = { ...updatedClient, contentPlan: { ...currentContentPlan, items: newItems } };
       } else if (type === 'capture') {
-        const captures = [...(updatedClient.captures || []), { id: newId, date: dateStr, title, notes, status: 'PLANNED', isRecurring }];
+        const captures = [...(updatedClient.captures || []), { id: newId, date: dateStr, title, notes, status: 'PLANNED', isRecurring, recurringDays: selectedRecurringDays }];
         updatedClient = { ...updatedClient, captures };
       } else if (type === 'meeting') {
-        const meetings = [...(updatedClient.meetings || []), { id: newId, date: dateStr, title, notes, status: 'PLANNED', isRecurring }];
+        const meetings = [...(updatedClient.meetings || []), { id: newId, date: dateStr, title, notes, status: 'PLANNED', isRecurring, recurringDays: selectedRecurringDays }];
         updatedClient = { ...updatedClient, meetings };
       }
     }
@@ -1993,17 +2017,49 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
                       />
                    </div>
 
-                   <div className="flex items-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/5">
-                      <input 
-                        type="checkbox" 
-                        name="isRecurring" 
-                        id="isRecurring"
-                        defaultChecked={selectedEvent?.isRecurring || (selectedEvent?.type === 'content' && client.billingModel === 'RECURRING')}
-                        className="w-4 h-4 rounded border-white/10 bg-white/5 text-accent-mint focus:ring-accent-mint/50" 
-                      />
-                      <label htmlFor="isRecurring" className="text-[11px] font-bold uppercase tracking-wider text-text-muted cursor-pointer hover:text-white transition-colors">
-                        Evento Recorrente (Mesmo dia todo mês)
-                      </label>
+                   <div className="space-y-4">
+                      <div className="flex items-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/5 mb-2">
+                         <input 
+                           type="checkbox" 
+                           name="isRecurring" 
+                           id="isRecurring"
+                           defaultChecked={selectedEvent?.isRecurring || (selectedEvent?.type === 'content' && client.billingModel === 'RECURRING')}
+                           className="w-4 h-4 rounded border-white/10 bg-white/5 text-accent-mint focus:ring-accent-mint/50" 
+                         />
+                         <label htmlFor="isRecurring" className="text-[11px] font-bold uppercase tracking-wider text-text-muted cursor-pointer hover:text-white transition-colors">
+                           Recorrência Mensal (Mesmo dia todo mês)
+                         </label>
+                      </div>
+
+                      <div>
+                         <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-3">Recorrência Semanal (Dias da Semana)</label>
+                         <div className="flex flex-wrap gap-2">
+                            {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, idx) => {
+                               const isSelected = selectedRecurringDays.includes(idx);
+                               return (
+                                 <button
+                                   key={day}
+                                   type="button"
+                                   onClick={() => {
+                                     if (isSelected) {
+                                       setSelectedRecurringDays(selectedRecurringDays.filter(d => d !== idx));
+                                     } else {
+                                       setSelectedRecurringDays([...selectedRecurringDays, idx]);
+                                     }
+                                   }}
+                                   className={cn(
+                                     "px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border",
+                                     isSelected 
+                                       ? "bg-accent-mint text-black border-accent-mint" 
+                                       : "bg-white/5 text-text-muted border-white/10 hover:border-white/20"
+                                   )}
+                                 >
+                                   {day}
+                                 </button>
+                               );
+                            })}
+                         </div>
+                      </div>
                    </div>
 
                    <div className="flex gap-4 pt-4">

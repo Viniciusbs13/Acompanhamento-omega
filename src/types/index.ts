@@ -57,6 +57,8 @@ export interface Client {
       title?: string;
       status: 'PLANNED' | 'POSTED';
       notes?: string;
+      isRecurring?: boolean;
+      recurringDays?: number[];
     }[];
   };
   captures?: {
@@ -65,6 +67,7 @@ export interface Client {
     title: string;
     status: 'PLANNED' | 'DONE';
     isRecurring?: boolean;
+    recurringDays?: number[];
     notes?: string;
   }[];
   meetings?: {
@@ -73,6 +76,7 @@ export interface Client {
     title: string;
     status: 'PLANNED' | 'DONE';
     isRecurring?: boolean;
+    recurringDays?: number[];
     notes?: string;
   }[];
 }
