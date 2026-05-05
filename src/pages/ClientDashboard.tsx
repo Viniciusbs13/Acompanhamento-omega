@@ -1720,13 +1720,15 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
   };
 
   const isEventDelayed = (event: any, date: Date) => {
-    if (event.status !== 'PLANNED') return false;
+    const dateStr = date.toISOString().split('T')[0];
+    const isCompleted = (event.isRecurring || event.recurringDays?.length > 0)
+      ? event.completedDates?.includes(dateStr)
+      : (event.status === 'POSTED' || event.status === 'DONE');
+
+    if (isCompleted) return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // For recurring items, we compare against the day of month, 
-    // but the intention is usually that it MUST be done by that day in the current month.
-    // If it's a past day in the current month and still PLANNED, it's delayed.
     return date < today;
   };
 
@@ -1736,39 +1738,84 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
     setShowEventModal(true);
   };
 
-  const handleEventClick = async (e: React.MouseEvent, event: any) => {
+  const handleEventClick = async (e: React.MouseEvent, event: any, date: Date) => {
     e.stopPropagation();
+    const dateStr = date.toISOString().split('T')[0];
+    const isRecurring = event.isRecurring || 
+                       (event.recurringDays && event.recurringDays.length > 0) || 
+                       (event.type === 'content' && client.billingModel === 'RECURRING');
     
-    // Toggle status on single click
     let updatedClient = { ...client };
     if (event.type === 'content') {
-      const items = (updatedClient.contentPlan?.items || []).map((i: any) => 
-        i.id === event.id ? { ...i, status: i.status === 'POSTED' ? 'PLANNED' : 'POSTED' } : i
-      );
+      const items = (updatedClient.contentPlan?.items || []).map((i: any) => {
+        if (i.id !== event.id) return i;
+        
+        if (isRecurring) {
+          const completedDates = i.completedDates || [];
+          const newCompleted = completedDates.includes(dateStr)
+            ? completedDates.filter((d: string) => d !== dateStr)
+            : [...completedDates, dateStr];
+          return { ...i, completedDates: newCompleted };
+        }
+        return { ...i, status: i.status === 'POSTED' ? 'PLANNED' : 'POSTED' };
+      });
       updatedClient = { ...updatedClient, contentPlan: { ...(updatedClient.contentPlan || { total: 0 }), items } };
-      toast.success(event.status === 'POSTED' ? 'Vídeo planejado' : 'Vídeo postado!');
+      
+      const isNowDone = isRecurring 
+        ? updatedClient.contentPlan.items.find((i: any) => i.id === event.id)?.completedDates?.includes(dateStr)
+        : updatedClient.contentPlan.items.find((i: any) => i.id === event.id)?.status === 'POSTED';
+      
+      toast.success(isNowDone ? 'Vídeo postado!' : 'Vídeo planejado');
     } else if (event.type === 'capture') {
-      const captures = (updatedClient.captures || []).map((i: any) => 
-        i.id === event.id ? { ...i, status: i.status === 'DONE' ? 'PLANNED' : 'DONE' } : i
-      );
+      const captures = (updatedClient.captures || []).map((i: any) => {
+        if (i.id !== event.id) return i;
+        
+        if (isRecurring) {
+          const completedDates = i.completedDates || [];
+          const newCompleted = completedDates.includes(dateStr)
+            ? completedDates.filter((d: string) => d !== dateStr)
+            : [...completedDates, dateStr];
+          return { ...i, completedDates: newCompleted };
+        }
+        return { ...i, status: i.status === 'DONE' ? 'PLANNED' : 'DONE' };
+      });
       updatedClient = { ...updatedClient, captures };
-      toast.success(event.status === 'DONE' ? 'Captação pendente' : 'Captação concluída!');
+      
+      const isNowDone = isRecurring 
+        ? updatedClient.captures.find((i: any) => i.id === event.id)?.completedDates?.includes(dateStr)
+        : updatedClient.captures.find((i: any) => i.id === event.id)?.status === 'DONE';
+
+      toast.success(isNowDone ? 'Captação concluída!' : 'Captação pendente');
     } else if (event.type === 'meeting') {
-      const meetings = (updatedClient.meetings || []).map((i: any) => 
-        i.id === event.id ? { ...i, status: i.status === 'DONE' ? 'PLANNED' : 'DONE' } : i
-      );
+      const meetings = (updatedClient.meetings || []).map((i: any) => {
+        if (i.id !== event.id) return i;
+        
+        if (isRecurring) {
+          const completedDates = i.completedDates || [];
+          const newCompleted = completedDates.includes(dateStr)
+            ? completedDates.filter((d: string) => d !== dateStr)
+            : [...completedDates, dateStr];
+          return { ...i, completedDates: newCompleted };
+        }
+        return { ...i, status: i.status === 'DONE' ? 'PLANNED' : 'DONE' };
+      });
       updatedClient = { ...updatedClient, meetings };
-      toast.success(event.status === 'DONE' ? 'Reunião pendente' : 'Reunião concluída!');
+
+      const isNowDone = isRecurring 
+        ? updatedClient.meetings.find((i: any) => i.id === event.id)?.completedDates?.includes(dateStr)
+        : updatedClient.meetings.find((i: any) => i.id === event.id)?.status === 'DONE';
+
+      toast.success(isNowDone ? 'Reunião concluída!' : 'Reunião pendente');
     }
 
     setClient(updatedClient);
     await storage.saveClient(updatedClient);
   };
 
-  const handleEventDoubleClick = (e: React.MouseEvent, event: any) => {
+  const handleEventDoubleClick = (e: React.MouseEvent, event: any, date: Date) => {
     e.stopPropagation();
     setSelectedEvent(event);
-    setSelectedDay(new Date(event.targetDate || event.date));
+    setSelectedDay(date);
     setShowEventModal(true);
   };
 
@@ -1913,19 +1960,24 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
               <div className="space-y-1">
                 {events.map((event: any) => {
                   const delayed = isEventDelayed(event, dateObj.date);
+                  const dateStr = dateObj.date.toISOString().split('T')[0];
+                  const isCompleted = (event.isRecurring || event.recurringDays?.length > 0)
+                    ? event.completedDates?.includes(dateStr)
+                    : (event.status === 'POSTED' || event.status === 'DONE');
+
                   return (
                     <button
-                      key={event.id}
-                      onClick={(e) => handleEventClick(e, event)}
-                      onDoubleClick={(e) => handleEventDoubleClick(e, event)}
+                      key={`${event.id}-${dateStr}`}
+                      onClick={(e) => handleEventClick(e, event, dateObj.date)}
+                      onDoubleClick={(e) => handleEventDoubleClick(e, event, dateObj.date)}
                       className={cn(
                         "w-full text-[8px] font-bold p-1 rounded-md border flex items-center gap-1 truncate text-left transition-all",
                         delayed && "border-accent-coral shadow-[0_0_10px_rgba(255,77,77,0.2)]",
                         event.type === 'content' 
-                          ? (event.status === 'POSTED' ? "bg-accent-mint/20 border-accent-mint/30 text-accent-mint" : (delayed ? "bg-accent-coral/10 text-accent-coral" : "bg-accent-mint/10 border-accent-mint/10 text-white/40"))
+                          ? (isCompleted ? "bg-accent-mint/20 border-accent-mint/30 text-accent-mint" : (delayed ? "bg-accent-coral/10 text-accent-coral" : "bg-accent-mint/10 border-accent-mint/10 text-white/40"))
                           : (event.type === 'capture' 
-                              ? (event.status === 'DONE' ? "bg-fuchsia-400/20 border-fuchsia-400/30 text-fuchsia-400" : (delayed ? "bg-accent-coral/10 text-accent-coral" : "bg-fuchsia-400/10 border-fuchsia-400/10 text-white/40"))
-                              : (event.status === 'DONE' ? "bg-blue-400/20 border-blue-400/30 text-blue-400" : (delayed ? "bg-accent-coral/10 text-accent-coral" : "bg-blue-400/10 border-blue-400/10 text-white/40"))
+                              ? (isCompleted ? "bg-fuchsia-400/20 border-fuchsia-400/30 text-fuchsia-400" : (delayed ? "bg-accent-coral/10 text-accent-coral" : "bg-fuchsia-400/10 border-fuchsia-400/10 text-white/40"))
+                              : (isCompleted ? "bg-blue-400/20 border-blue-400/30 text-blue-400" : (delayed ? "bg-accent-coral/10 text-accent-coral" : "bg-blue-400/10 border-blue-400/10 text-white/40"))
                             )
                       )}
                     >
