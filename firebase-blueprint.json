@@ -76,6 +76,34 @@
         "ownerId": { "type": "string" }
       },
       "required": ["clientId", "date", "investment", "ownerId"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "A single sale record.",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "service": { "type": "string" },
+        "value": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["PAID", "PENDING"] },
+        "origin": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["clientId", "value", "date", "status", "ownerId"]
+    },
+    "CommercialGoal": {
+      "title": "Commercial Goal",
+      "description": "Monthly commercial target/goal.",
+      "type": "object",
+      "properties": {
+        "month": { "type": "number" },
+        "year": { "type": "number" },
+        "target": { "type": "number" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["month", "year", "target", "ownerId"]
     }
   },
   "firestore": {
@@ -90,6 +118,14 @@
     "/clients/{clientId}/entries/{entryId}": {
       "schema": "MetricEntry",
       "description": "Metric entries sub-collection for each client."
+    },
+    "/sales/{saleId}": {
+      "schema": "Sale",
+      "description": "Sales collection."
+    },
+    "/goals/{goalId}": {
+      "schema": "CommercialGoal",
+      "description": "Goals collection."
     }
   }
 }

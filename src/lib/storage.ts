@@ -1,5 +1,5 @@
 import { firebaseStorage } from './firebaseStorage';
-import { Client, MetricEntry, UserSettings } from '../types';
+import { Client, MetricEntry, UserSettings, Sale, CommercialGoal } from '../types';
 
 export const storage = {
   getClients: async (): Promise<Client[]> => {
@@ -32,5 +32,26 @@ export const storage = {
 
   saveSettings: async (settings: UserSettings) => {
     await firebaseStorage.saveSettings(settings);
+  },
+
+  // Commercial
+  getSales: async (monthYear?: string): Promise<Sale[]> => {
+    return await firebaseStorage.getSales(monthYear);
+  },
+  
+  saveSale: async (sale: Sale) => {
+    await firebaseStorage.saveSale(sale);
+  },
+
+  deleteSale: async (id: string) => {
+    await firebaseStorage.deleteSale(id);
+  },
+
+  getGoals: async (): Promise<CommercialGoal[]> => {
+    return await firebaseStorage.getGoals();
+  },
+
+  saveGoal: async (goal: CommercialGoal) => {
+    await firebaseStorage.saveGoal(goal);
   }
 };

@@ -136,3 +136,31 @@ export interface UserSettings {
   managerName: string;
   theme: 'light' | 'dark';
 }
+
+export interface Sale {
+  id: string;
+  clientId: string;
+  clientName: string;
+  service: string;
+  value: number;
+  date: string; // ISO Date
+  status: 'PAID' | 'PENDING';
+  origin: string; // Instagram, Indication, etc.
+  ownerId?: string;
+}
+
+export interface CommercialGoal {
+  id: string; // e.g. "2026-05"
+  month: number;
+  year: number;
+  target: number;
+  ownerId?: string;
+}
+
+export interface CommercialMetrics {
+  totalRevenue: number;
+  target: number;
+  salesCount: number;
+  averageTicket: number;
+  monthYear: string; // "MM/YYYY"
+}

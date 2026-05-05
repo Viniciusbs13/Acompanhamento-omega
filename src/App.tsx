@@ -14,6 +14,7 @@ import { ClientNew } from './pages/ClientNew';
 import { ClientDashboard } from './pages/ClientDashboard';
 import { Reports } from './pages/Reports';
 import { Management } from './pages/Management';
+import { Commercial } from './pages/Commercial';
 import { Settings } from './pages/Settings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { VisibilityProvider } from './contexts/VisibilityContext';
@@ -47,6 +48,7 @@ export default function App() {
               <Route path="/clientes" element={<ErrorBoundary><ClientList /></ErrorBoundary>} />
               <Route path="/clientes/novo" element={<ErrorBoundary><ClientNew /></ErrorBoundary>} />
               <Route path="/clientes/:id" element={<ErrorBoundary><ClientDashboard /></ErrorBoundary>} />
+              <Route path="/comercial" element={<ErrorBoundary><Commercial /></ErrorBoundary>} />
               <Route path="/gestao" element={<ErrorBoundary><Management /></ErrorBoundary>} />
               <Route path="/relatorios" element={<ErrorBoundary><Reports /></ErrorBoundary>} />
               <Route path="/configuracoes" element={<ErrorBoundary><Settings /></ErrorBoundary>} />

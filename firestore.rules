@@ -72,5 +72,40 @@ service cloud.firestore {
         allow delete: if isSignedIn() && isOwner(existing());
       }
     }
+
+    // Sales Registry
+    match /sales/{saleId} {
+      function isValidSale(data) {
+        return data.clientId is string && data.clientId.size() <= 128 &&
+               data.value is number &&
+               data.date is string && data.date.size() <= 64 &&
+               data.status in ['PAID', 'PENDING'] &&
+               data.ownerId == request.auth.uid;
+      }
+
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(saleId) && isValidSale(incoming());
+      allow update: if isSignedIn() && isOwner(existing()) && isValidSale(incoming()) &&
+                    incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() && isOwner(existing());
+    }
+
+    // Commercial Goals
+    match /goals/{goalId} {
+      function isValidGoal(data) {
+        return data.month is number &&
+               data.year is number &&
+               data.target is number &&
+               data.ownerId == request.auth.uid;
+      }
+
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(goalId) && isValidGoal(incoming());
+      allow update: if isSignedIn() && isOwner(existing()) && isValidGoal(incoming()) &&
+                    incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() && isOwner(existing());
+    }
   }
 }

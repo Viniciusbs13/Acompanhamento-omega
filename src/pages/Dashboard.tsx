@@ -90,9 +90,12 @@ export function Dashboard() {
 
   const [selectedCategory, setSelectedCategory] = useState<string>('todos');
 
-  const filteredClients = useMemo(() => {
-    if (selectedCategory === 'todos') return clients;
-    return clients.filter(c => c.businessType === selectedCategory);
+  const categorizedClients = useMemo(() => {
+    const base = selectedCategory === 'todos' ? clients : clients.filter(c => c.businessType === selectedCategory);
+    return {
+      monthly: base.filter(c => c.billingModel !== 'ONE_OFF'),
+      single: base.filter(c => c.billingModel === 'ONE_OFF')
+    };
   }, [clients, selectedCategory]);
 
   const categories = useMemo(() => {
@@ -185,11 +188,37 @@ export function Dashboard() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredClients.length > 0 ? filteredClients.slice(0, 6).map((client, i) => (
-             <GlobalClientCard key={client.id} client={client} index={i} entries={stats.clientEntries[client.id] || []} />
-          )) : (
-            <div className="col-span-full py-20 flex flex-col items-center justify-center glass rounded-3xl border-dashed">
+        <div className="space-y-12">
+          {categorizedClients.monthly.length > 0 && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-accent-mint" />
+                <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Planos Mensais</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {categorizedClients.monthly.slice(0, 6).map((client, i) => (
+                  <GlobalClientCard key={client.id} client={client} index={i} entries={stats.clientEntries[client.id] || []} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {categorizedClients.single.length > 0 && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-text-muted" />
+                <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Trabalhos Únicos</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {categorizedClients.single.map((client, i) => (
+                  <GlobalClientCard key={client.id} client={client} index={i + 10} entries={stats.clientEntries[client.id] || []} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {categorizedClients.monthly.length === 0 && categorizedClients.single.length === 0 && (
+            <div className="py-20 flex flex-col items-center justify-center glass rounded-3xl border-dashed">
               <PlusCircle size={40} className="text-text-muted mb-4 opacity-20" />
               <p className="text-text-secondary font-medium">Nenhum cliente encontrado nesta categoria.</p>
               <button onClick={() => setSelectedCategory('todos')} className="text-accent-mint text-sm mt-3 font-bold hover:underline">Ver todos os clientes</button>

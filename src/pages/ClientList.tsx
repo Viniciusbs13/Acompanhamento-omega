@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Plus, Search, Filter, Briefcase, TrendingUp, AlertTriangle, CheckCircle2, MoreVertical, LayoutGrid, List, Users, ArrowRight, Trash2 } from 'lucide-react';
@@ -55,9 +55,15 @@ export function ClientList() {
     }
   };
 
-  const filteredClients = clients.filter(c => 
-    c.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const categorizedClients = useMemo(() => {
+    const base = clients.filter(c => 
+      c.name.toLowerCase().includes(search.toLowerCase())
+    );
+    return {
+      monthly: base.filter(c => c.billingModel !== 'ONE_OFF'),
+      single: base.filter(c => c.billingModel === 'ONE_OFF')
+    };
+  }, [clients, search]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -103,7 +109,7 @@ export function ClientList() {
         <div className="py-32 flex justify-center">
           <div className="w-8 h-8 rounded-full border-t-2 border-accent-mint animate-spin" />
         </div>
-      ) : filteredClients.length === 0 ? (
+      ) : (categorizedClients.monthly.length === 0 && categorizedClients.single.length === 0) ? (
         <div className="py-32 flex flex-col items-center text-center glass rounded-3xl border-dashed">
           <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mb-6">
             <Users size={32} className="text-text-muted" />
@@ -117,25 +123,64 @@ export function ClientList() {
           </Link>
         </div>
       ) : (
-        <div className={cn(
-          viewMode === 'grid' 
-            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" 
-            : "flex flex-col gap-2"
-        )}>
-          {filteredClients.map((client, i) => (
-            <motion.div
-              key={client.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-            >
-               {viewMode === 'grid' ? (
-                 <ClientGridItem client={client} entries={allEntries[client.id] || []} onDelete={handleDeleteClient} />
-               ) : (
-                 <ClientListItem client={client} entries={allEntries[client.id] || []} onDelete={handleDeleteClient} />
-               )}
-            </motion.div>
-          ))}
+        <div className="space-y-12">
+          {categorizedClients.monthly.length > 0 && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-accent-mint" />
+                <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Planos Mensais</h3>
+              </div>
+              <div className={cn(
+                viewMode === 'grid' 
+                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" 
+                  : "flex flex-col gap-2"
+              )}>
+                {categorizedClients.monthly.map((client, i) => (
+                  <motion.div
+                    key={client.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                     {viewMode === 'grid' ? (
+                       <ClientGridItem client={client} entries={allEntries[client.id] || []} onDelete={handleDeleteClient} />
+                     ) : (
+                       <ClientListItem client={client} entries={allEntries[client.id] || []} onDelete={handleDeleteClient} />
+                     )}
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {categorizedClients.single.length > 0 && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-text-muted" />
+                <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Trabalhos Únicos</h3>
+              </div>
+              <div className={cn(
+                viewMode === 'grid' 
+                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" 
+                  : "flex flex-col gap-2"
+              )}>
+                {categorizedClients.single.map((client, i) => (
+                  <motion.div
+                    key={client.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                     {viewMode === 'grid' ? (
+                       <ClientGridItem client={client} entries={allEntries[client.id] || []} onDelete={handleDeleteClient} />
+                     ) : (
+                       <ClientListItem client={client} entries={allEntries[client.id] || []} onDelete={handleDeleteClient} />
+                     )}
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

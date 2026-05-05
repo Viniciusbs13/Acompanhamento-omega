@@ -11,7 +11,7 @@ import {
   onSnapshot 
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import { Client, MetricEntry, UserSettings } from '../types';
+import { Client, MetricEntry, UserSettings, Sale, CommercialGoal } from '../types';
 
 enum OperationType {
   CREATE = 'create',
@@ -62,8 +62,76 @@ function cleanData(data: any) {
 
 const CLIENTS_COL = 'clients';
 const USERS_COL = 'users';
+const SALES_COL = 'sales';
+const GOALS_COL = 'goals';
 
 export const firebaseStorage = {
+  // Sales
+  getSales: async (monthYear?: string): Promise<Sale[]> => {
+    if (!auth.currentUser) return [];
+    const path = SALES_COL;
+    try {
+      let q = query(collection(db, path), where('ownerId', '==', auth.currentUser.uid), orderBy('date', 'desc'));
+      if (monthYear) {
+        // Simple string prefix query for "YYYY-MM" if we format dates correctly
+        // Or we can filter in JS for simplicity since sales volume per month is usually manageable
+      }
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Sale));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  saveSale: async (sale: Sale) => {
+    if (!auth.currentUser) return;
+    const path = `${SALES_COL}/${sale.id}`;
+    try {
+      await setDoc(doc(db, SALES_COL, sale.id), cleanData({
+        ...sale,
+        ownerId: auth.currentUser.uid
+      }), { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  deleteSale: async (id: string) => {
+    const path = `${SALES_COL}/${id}`;
+    try {
+      await deleteDoc(doc(db, SALES_COL, id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  // Goals
+  getGoals: async (): Promise<CommercialGoal[]> => {
+    if (!auth.currentUser) return [];
+    const path = GOALS_COL;
+    try {
+      const q = query(collection(db, path), where('ownerId', '==', auth.currentUser.uid));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as CommercialGoal));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  saveGoal: async (goal: CommercialGoal) => {
+    if (!auth.currentUser) return;
+    const path = `${GOALS_COL}/${goal.id}`;
+    try {
+      await setDoc(doc(db, GOALS_COL, goal.id), cleanData({
+        ...goal,
+        ownerId: auth.currentUser.uid
+      }), { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
   // Clients
   getClients: async (): Promise<Client[]> => {
     if (!auth.currentUser) return [];
