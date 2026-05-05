@@ -59,6 +59,8 @@ export interface Client {
       notes?: string;
       isRecurring?: boolean;
       recurringDays?: number[];
+      recurrenceType?: 'DAILY' | 'WEEKLY' | 'MONTHLY_DAY' | 'MONTHLY_ORDINAL' | 'NONE';
+      ordinalWeekday?: { ordinal: number; day: number };
       completedDates?: string[];
       deletedDates?: string[];
     }[];
@@ -70,6 +72,8 @@ export interface Client {
     status: 'PLANNED' | 'DONE';
     isRecurring?: boolean;
     recurringDays?: number[];
+    recurrenceType?: 'DAILY' | 'WEEKLY' | 'MONTHLY_DAY' | 'MONTHLY_ORDINAL' | 'NONE';
+    ordinalWeekday?: { ordinal: number; day: number };
     completedDates?: string[];
     deletedDates?: string[];
     notes?: string;
@@ -81,6 +85,8 @@ export interface Client {
     status: 'PLANNED' | 'DONE';
     isRecurring?: boolean;
     recurringDays?: number[];
+    recurrenceType?: 'DAILY' | 'WEEKLY' | 'MONTHLY_DAY' | 'MONTHLY_ORDINAL' | 'NONE';
+    ordinalWeekday?: { ordinal: number; day: number };
     completedDates?: string[];
     deletedDates?: string[];
     notes?: string;
