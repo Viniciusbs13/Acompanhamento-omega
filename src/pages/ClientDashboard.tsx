@@ -98,6 +98,7 @@ export function ClientDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'calendar' | 'entries' | 'report' | 'settings'>('overview');
   const [isPresenting, setIsPresenting] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'monthly'>('all');
+  const [currentDate, setCurrentDate] = useState(new Date());
   const containerRef = useRef<HTMLDivElement>(null);
   
   const [client, setClient] = useState<any>(null);
@@ -274,6 +275,52 @@ export function ClientDashboard() {
   const previousMetrics = useMemo(() => previousEntry ? calculateMetrics(previousEntry, client?.businessType) : undefined, [previousEntry, client?.businessType]);
   const insights = useMemo(() => metrics ? generateInsights(metrics, previousMetrics) : [], [metrics, previousMetrics]);
   const health = useMemo(() => metrics ? getHealthStatus(metrics, 4) : 'GOOD', [metrics]);
+
+  const monthStats = useMemo(() => {
+    if (!client) return { total: 0, posted: 0 };
+    
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    let totalCount = 0;
+    let postedCount = 0;
+    const isRecurringClient = client.billingModel === 'RECURRING';
+
+    if (client.contentPlan?.items) {
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dayDate = new Date(year, month, d);
+        const dateStr = dayDate.toISOString().split('T')[0];
+        
+        client.contentPlan.items.forEach((item: any) => {
+          if (item.deletedDates?.includes(dateStr)) return;
+
+          const itemDate = new Date(item.targetDate + "T12:00:00");
+          const sameDayOfMonth = dayDate.getDate() === itemDate.getDate();
+          const sameDayOfWeek = item.recurringDays?.includes(dayDate.getDay());
+          
+          const isRecurring = item.isRecurring || (isRecurringClient && !item.recurringDays);
+          let occurs = false;
+
+          if (isRecurring) {
+            if (sameDayOfMonth || sameDayOfWeek) occurs = true;
+          } else if (item.recurringDays?.length > 0) {
+            if (sameDayOfWeek) occurs = true;
+          } else {
+            if (dateStr === item.targetDate) occurs = true;
+          }
+
+          if (occurs) {
+            totalCount++;
+            const isCompleted = isRecurring ? item.completedDates?.includes(dateStr) : item.status === 'POSTED';
+            if (isCompleted) postedCount++;
+          }
+        });
+      }
+    }
+    
+    return { total: totalCount, posted: postedCount };
+  }, [client, currentDate]);
 
   const chartData = useMemo(() => displayEntries.map(e => ({
     name: new Date(e.date).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
@@ -479,8 +526,8 @@ export function ClientDashboard() {
                   <ClientKPICard label="Leads" value={lastEntry?.leads || 0} trend={lastEntry && previousEntry ? (((lastEntry.leads || 0) / (previousEntry.leads || 1) - 1) * 100) : 0} />
                   <ClientKPICard 
                     label="Vídeos" 
-                    value={client.contentPlan?.items?.filter((i: any) => i.status === 'POSTED').length || 0} 
-                    suffix={`/ ${client.contentPlan?.total || 0}`} 
+                    value={monthStats.posted} 
+                    suffix={`/ ${monthStats.total}`} 
                     color={isContentDelayed(client) ? 'text-accent-coral shadow-[0_0_15px_rgba(255,77,77,0.2)]' : undefined}
                   />
                   <ClientKPICard label="Vendas" value={lastEntry?.sales || 0} color="text-accent-mint" />
@@ -493,8 +540,8 @@ export function ClientDashboard() {
                   <ClientKPICard label="Investimento" value={lastEntry?.investment || 0} isCurrency />
                   <ClientKPICard 
                     label="Vídeos" 
-                    value={client.contentPlan?.items?.filter((i: any) => i.status === 'POSTED').length || 0} 
-                    suffix={`/ ${client.contentPlan?.total || 0}`} 
+                    value={monthStats.posted} 
+                    suffix={`/ ${monthStats.total}`} 
                     color={isContentDelayed(client) ? 'text-accent-coral shadow-[0_0_15px_rgba(255,77,77,0.2)]' : undefined}
                   />
                   {!config.hideCac && <ClientKPICard label="CAC" value={metrics?.cac || 0} isCurrency color="text-accent-coral" />}
@@ -530,19 +577,19 @@ export function ClientDashboard() {
                       <div className="flex justify-between items-end">
                         <div className="flex items-baseline gap-2">
                           <span className="text-3xl font-medium tracking-tighter">
-                            {client.contentPlan.items?.filter((i: any) => i.status === 'POSTED').length || 0}
+                            {monthStats.posted}
                           </span>
-                          <span className="text-xl font-light text-text-muted"> / {client.contentPlan.total}</span>
+                          <span className="text-xl font-light text-text-muted"> / {monthStats.total}</span>
                         </div>
                         <span className={cn("text-[10px] font-bold uppercase", isContentDelayed(client) ? "text-accent-coral" : "text-accent-mint")}>
-                          {Math.round(((client.contentPlan.items?.filter((i: any) => i.status === 'POSTED').length || 0) / (client.contentPlan.total || 1)) * 100)}%
+                          {Math.round((monthStats.posted / (monthStats.total || 1)) * 100)}%
                         </span>
                       </div>
                       
                       <div className="h-2 bg-white/5 rounded-full overflow-hidden">
                         <motion.div 
                           initial={{ width: 0 }}
-                          animate={{ width: `${Math.min(100, ((client.contentPlan.items?.filter((i: any) => i.status === 'POSTED').length || 0) / (client.contentPlan.total || 1)) * 100)}%` }}
+                          animate={{ width: `${Math.min(100, (monthStats.posted / (monthStats.total || 1)) * 100)}%` }}
                           className={cn(
                             "h-full transition-all shadow-[0_0_15px_rgba(0,0,0,0.2)]",
                             isContentDelayed(client) ? "bg-accent-coral shadow-accent-coral/30" : "bg-accent-mint shadow-accent-mint/30"
@@ -727,7 +774,12 @@ export function ClientDashboard() {
             animate={{ opacity: 1 }}
             className="space-y-6"
           >
-            <DashboardCalendar client={client} setClient={setClient} />
+            <DashboardCalendar 
+              client={client} 
+              setClient={setClient} 
+              currentDate={currentDate} 
+              setCurrentDate={setCurrentDate} 
+            />
           </motion.div>
         )}
 
@@ -1600,8 +1652,17 @@ export function ClientDashboard() {
   );
 }
 
-function DashboardCalendar({ client, setClient }: { client: any, setClient: any }) {
-  const [currentDate, setCurrentDate] = useState(new Date());
+function DashboardCalendar({ 
+  client, 
+  setClient, 
+  currentDate, 
+  setCurrentDate 
+}: { 
+  client: any, 
+  setClient: any, 
+  currentDate: Date, 
+  setCurrentDate: (d: Date) => void 
+}) {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
