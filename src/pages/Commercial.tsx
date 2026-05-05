@@ -76,6 +76,18 @@ export function Commercial() {
 
   // Metrics
   const totalRevenue = useMemo(() => monthlySales.reduce((acc, s) => acc + s.value, 0), [monthlySales]);
+  const recurringRevenue = useMemo(() => 
+    monthlySales
+      .filter(s => s.billingModel === 'RECURRING' || (!s.billingModel && clients.find(c => c.id === s.clientId)?.billingModel !== 'ONE_OFF'))
+      .reduce((acc, s) => acc + s.value, 0), 
+  [monthlySales, clients]);
+  
+  const oneOffRevenue = useMemo(() => 
+    monthlySales
+      .filter(s => s.billingModel === 'ONE_OFF' || (!s.billingModel && clients.find(c => c.id === s.clientId)?.billingModel === 'ONE_OFF'))
+      .reduce((acc, s) => acc + s.value, 0), 
+  [monthlySales, clients]);
+
   const salesCount = monthlySales.length;
   const avgTicket = salesCount > 0 ? totalRevenue / salesCount : 0;
   const progress = monthlyGoal.target > 0 ? (totalRevenue / monthlyGoal.target) * 100 : 0;
@@ -153,7 +165,8 @@ export function Commercial() {
       value: Number(data.value) || 0,
       date: data.date || new Date().toISOString(),
       status: (data.status as any) || 'PAID',
-      origin: data.origin || 'Instagram'
+      origin: data.origin || 'Instagram',
+      billingModel: (data.billingModel as any) || (clients.find(c => c.id === clientId)?.billingModel) || 'RECURRING'
     };
     await storage.saveSale(newSale);
     setSales(prev => [newSale, ...prev]);
@@ -214,6 +227,7 @@ export function Commercial() {
           icon={DollarSign} 
           color="text-accent-mint"
           trend={growth}
+          subtitle={`Recorrente: ${recurringRevenue.toLocaleString()} | Único: ${oneOffRevenue.toLocaleString()}`}
         />
         <SummaryCard 
           label="Meta Mensal" 
@@ -392,9 +406,9 @@ export function Commercial() {
                       {clients.find(c => c.id === sale.clientId)?.billingModel && (
                         <span className={cn(
                           "text-[7px] font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded w-fit mt-1 ml-11",
-                          clients.find(c => c.id === sale.clientId)?.billingModel === 'ONE_OFF' ? "bg-blue-400/10 text-blue-400" : "bg-accent-mint/10 text-accent-mint"
+                          (sale.billingModel || clients.find(c => c.id === sale.clientId)?.billingModel) === 'ONE_OFF' ? "bg-blue-400/10 text-blue-400" : "bg-accent-mint/10 text-accent-mint"
                         )}>
-                          {clients.find(c => c.id === sale.clientId)?.billingModel === 'ONE_OFF' ? 'Único' : 'Mensal'}
+                          {(sale.billingModel || clients.find(c => c.id === sale.clientId)?.billingModel) === 'ONE_OFF' ? 'Único' : 'Mensal'}
                         </span>
                       )}
                     </div>
@@ -477,6 +491,19 @@ export function Commercial() {
                 <div className="space-y-4">
                    <div>
                       <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Cliente</label>
+                      <div className="mb-4">
+                         <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Tipo de Faturamento</label>
+                         <div className="grid grid-cols-2 gap-2">
+                            <label className="flex items-center gap-2 p-3 rounded-xl border border-white/10 bg-white/5 cursor-pointer hover:border-accent-mint/50 transition-colors">
+                               <input type="radio" name="billingModel" value="RECURRING" defaultChecked className="accent-accent-mint" />
+                               <span className="text-[10px] font-bold uppercase tracking-widest">Plano Mensal</span>
+                            </label>
+                            <label className="flex items-center gap-2 p-3 rounded-xl border border-white/10 bg-white/5 cursor-pointer hover:border-accent-mint/50 transition-colors">
+                               <input type="radio" name="billingModel" value="ONE_OFF" className="accent-accent-mint" />
+                               <span className="text-[10px] font-bold uppercase tracking-widest">Trabalho Único</span>
+                            </label>
+                         </div>
+                      </div>
                       <select 
                         name="clientId" 
                         id="clientSelect"
@@ -556,7 +583,7 @@ export function Commercial() {
   );
 }
 
-function SummaryCard({ label, value, isCurrency, icon: Icon, color = "text-white", action, trend }: any) {
+function SummaryCard({ label, value, isCurrency, icon: Icon, color = "text-white", action, trend, subtitle }: any) {
   return (
     <div 
       onClick={action}
@@ -585,6 +612,9 @@ function SummaryCard({ label, value, isCurrency, icon: Icon, color = "text-white
         <p className={cn("text-2xl font-medium tracking-tight mt-1", color)}>
           {isCurrency ? `R$ ${value.toLocaleString()}` : value}
         </p>
+        {subtitle && (
+          <p className="text-[9px] font-bold text-text-muted uppercase tracking-tighter mt-1">{subtitle}</p>
+        )}
       </div>
     </div>
   );

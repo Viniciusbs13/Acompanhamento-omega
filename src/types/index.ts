@@ -146,6 +146,7 @@ export interface Sale {
   date: string; // ISO Date
   status: 'PAID' | 'PENDING';
   origin: string; // Instagram, Indication, etc.
+  billingModel?: BillingModel;
   ownerId?: string;
 }
 
