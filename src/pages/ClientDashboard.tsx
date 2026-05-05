@@ -1652,6 +1652,8 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
     
     if (client.contentPlan?.items) {
       client.contentPlan.items.forEach((item: any) => {
+        if (item.deletedDates?.includes(dateStr)) return;
+        
         const itemDate = new Date(item.targetDate + "T12:00:00");
         const sameDayOfMonth = date.getDate() === itemDate.getDate();
         const sameDayOfWeek = item.recurringDays?.includes(date.getDay());
@@ -1674,6 +1676,8 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
     
     if (client.captures) {
       client.captures.forEach((cap: any) => {
+        if (cap.deletedDates?.includes(dateStr)) return;
+        
         const capDate = new Date(cap.date + "T12:00:00");
         const sameDayOfMonth = date.getDate() === capDate.getDate();
         const sameDayOfWeek = cap.recurringDays?.includes(date.getDay());
@@ -1696,6 +1700,8 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
 
     if (client.meetings) {
       client.meetings.forEach((meeting: any) => {
+        if (meeting.deletedDates?.includes(dateStr)) return;
+        
         const meetDate = new Date(meeting.date + "T12:00:00");
         const sameDayOfMonth = date.getDate() === meetDate.getDate();
         const sameDayOfWeek = meeting.recurringDays?.includes(date.getDay());
@@ -1868,20 +1874,53 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
     toast.success(selectedEvent ? "Evento atualizado!" : "Evento adicionado!");
   };
 
-  const handleDeleteEvent = async () => {
+  const handleDeleteEvent = async (onlyThisOccurrence: boolean = false) => {
     if (!selectedEvent) return;
-    if (!window.confirm("Deseja apagar este evento?")) return;
+    
+    const isRecurring = selectedEvent.isRecurring || 
+                       (selectedEvent.recurringDays && selectedEvent.recurringDays.length > 0) || 
+                       (selectedEvent.type === 'content' && client.billingModel === 'RECURRING');
+
+    if (!window.confirm(onlyThisOccurrence ? "Apagar apenas esta ocorrência?" : "Deseja apagar este evento (toda a série)?")) return;
 
     let updatedClient = { ...client };
-    if (selectedEvent.type === 'content') {
-      const items = updatedClient.contentPlan.items.filter((i: any) => i.id !== selectedEvent.id);
-      updatedClient = { ...updatedClient, contentPlan: { ...updatedClient.contentPlan, items } };
-    } else if (selectedEvent.type === 'capture') {
-      const captures = updatedClient.captures.filter((i: any) => i.id !== selectedEvent.id);
-      updatedClient = { ...updatedClient, captures };
-    } else if (selectedEvent.type === 'meeting') {
-      const meetings = updatedClient.meetings.filter((i: any) => i.id !== selectedEvent.id);
-      updatedClient = { ...updatedClient, meetings };
+    const dateStr = selectedDay?.toISOString().split('T')[0] || '';
+
+    if (onlyThisOccurrence && isRecurring) {
+      if (selectedEvent.type === 'content') {
+        const items = (updatedClient.contentPlan?.items || []).map((i: any) => {
+          if (i.id !== selectedEvent.id) return i;
+          const deletedDates = i.deletedDates || [];
+          return { ...i, deletedDates: [...deletedDates, dateStr] };
+        });
+        updatedClient = { ...updatedClient, contentPlan: { ...(updatedClient.contentPlan || { total: 0 }), items } };
+      } else if (selectedEvent.type === 'capture') {
+        const captures = (updatedClient.captures || []).map((i: any) => {
+          if (i.id !== selectedEvent.id) return i;
+          const deletedDates = i.deletedDates || [];
+          return { ...i, deletedDates: [...deletedDates, dateStr] };
+        });
+        updatedClient = { ...updatedClient, captures };
+      } else if (selectedEvent.type === 'meeting') {
+        const meetings = (updatedClient.meetings || []).map((i: any) => {
+          if (i.id !== selectedEvent.id) return i;
+          const deletedDates = i.deletedDates || [];
+          return { ...i, deletedDates: [...deletedDates, dateStr] };
+        });
+        updatedClient = { ...updatedClient, meetings };
+      }
+    } else {
+      // Delete whole series
+      if (selectedEvent.type === 'content') {
+        const items = updatedClient.contentPlan.items.filter((i: any) => i.id !== selectedEvent.id);
+        updatedClient = { ...updatedClient, contentPlan: { ...updatedClient.contentPlan, items } };
+      } else if (selectedEvent.type === 'capture') {
+        const captures = updatedClient.captures.filter((i: any) => i.id !== selectedEvent.id);
+        updatedClient = { ...updatedClient, captures };
+      } else if (selectedEvent.type === 'meeting') {
+        const meetings = updatedClient.meetings.filter((i: any) => i.id !== selectedEvent.id);
+        updatedClient = { ...updatedClient, meetings };
+      }
     }
 
     setClient(updatedClient);
@@ -2116,13 +2155,24 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
 
                    <div className="flex gap-4 pt-4">
                       {selectedEvent && (
-                        <button 
-                          type="button" 
-                          onClick={handleDeleteEvent}
-                          className="flex-1 px-6 py-4 bg-accent-coral/10 text-accent-coral rounded-xl text-sm font-bold border border-accent-coral/20 hover:bg-accent-coral/20 transition-all"
-                        >
-                          Apagar
-                        </button>
+                        <div className="flex-1 flex flex-col gap-2">
+                          <button 
+                            type="button" 
+                            onClick={() => handleDeleteEvent(false)}
+                            className="w-full px-4 py-3 bg-accent-coral/10 text-accent-coral rounded-xl text-[10px] font-bold uppercase tracking-widest border border-accent-coral/20 hover:bg-accent-coral/20 transition-all"
+                          >
+                            Apagar Série
+                          </button>
+                          {(selectedEvent.isRecurring || selectedEvent.recurringDays?.length > 0 || (selectedEvent.type === 'content' && client.billingModel === 'RECURRING')) && (
+                            <button 
+                              type="button" 
+                              onClick={() => handleDeleteEvent(true)}
+                              className="w-full px-4 py-3 bg-accent-amber/10 text-accent-amber rounded-xl text-[10px] font-bold uppercase tracking-widest border border-accent-amber/20 hover:bg-accent-amber/20 transition-all"
+                            >
+                              Apagar Apenas Hoje
+                            </button>
+                          )}
+                        </div>
                       )}
                       <button 
                         type="submit" 

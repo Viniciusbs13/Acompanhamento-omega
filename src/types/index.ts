@@ -60,6 +60,7 @@ export interface Client {
       isRecurring?: boolean;
       recurringDays?: number[];
       completedDates?: string[];
+      deletedDates?: string[];
     }[];
   };
   captures?: {
@@ -70,6 +71,7 @@ export interface Client {
     isRecurring?: boolean;
     recurringDays?: number[];
     completedDates?: string[];
+    deletedDates?: string[];
     notes?: string;
   }[];
   meetings?: {
@@ -80,6 +82,7 @@ export interface Client {
     isRecurring?: boolean;
     recurringDays?: number[];
     completedDates?: string[];
+    deletedDates?: string[];
     notes?: string;
   }[];
 }
