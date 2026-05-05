@@ -18,9 +18,15 @@ interface DashboardStats {
 }
 
 const isContentDelayed = (client: any) => {
-  if (!client.contentPlan || !client.contentPlan.items) return false;
-  const today = new Date().toISOString().split('T')[0];
-  return client.contentPlan.items.some((item: any) => item.status === 'PLANNED' && item.targetDate < today);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split('T')[0];
+
+  if (client.contentPlan?.items?.some((item: any) => item.status === 'PLANNED' && item.targetDate < todayStr)) return true;
+  if (client.captures?.some((item: any) => item.status === 'PLANNED' && item.date < todayStr)) return true;
+  if (client.meetings?.some((item: any) => item.status === 'PLANNED' && item.date < todayStr)) return true;
+  
+  return false;
 };
 
 export function Dashboard() {

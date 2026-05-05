@@ -43,6 +43,7 @@ export interface Client {
   ownerNames?: string;
   planValue?: number;
   planScope?: string;
+  contactInfo?: string;
   contractUrl?: string;
   managementStatus?: ManagementFlag;
   billingModel?: BillingModel;
@@ -53,7 +54,9 @@ export interface Client {
     items: {
       id: string;
       targetDate: string;
+      title?: string;
       status: 'PLANNED' | 'POSTED';
+      notes?: string;
     }[];
   };
   captures?: {
@@ -61,6 +64,16 @@ export interface Client {
     date: string;
     title: string;
     status: 'PLANNED' | 'DONE';
+    isRecurring?: boolean;
+    notes?: string;
+  }[];
+  meetings?: {
+    id: string;
+    date: string;
+    title: string;
+    status: 'PLANNED' | 'DONE';
+    isRecurring?: boolean;
+    notes?: string;
   }[];
 }
 

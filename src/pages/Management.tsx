@@ -255,7 +255,6 @@ function ClientRow({ client, updateStatus, isVisible }: any) {
               {client.billingModel === 'ONE_OFF' ? 'Projeto' : 'Mensal'}
             </span>
           </div>
-          <span className="text-[10px] text-text-muted truncate max-w-[150px]">{client.planScope || 'Escopo básico'}</span>
         </div>
       </td>
       <td className="px-6 py-4">

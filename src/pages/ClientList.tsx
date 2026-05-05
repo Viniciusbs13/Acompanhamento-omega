@@ -9,6 +9,18 @@ import { cn, formatCurrency } from '../lib/utils';
 import { useVisibility } from '../contexts/VisibilityContext';
 import { toast } from 'sonner';
 
+const isContentDelayed = (client: any) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split('T')[0];
+
+  if (client.contentPlan?.items?.some((item: any) => item.status === 'PLANNED' && item.targetDate < todayStr)) return true;
+  if (client.captures?.some((item: any) => item.status === 'PLANNED' && item.date < todayStr)) return true;
+  if (client.meetings?.some((item: any) => item.status === 'PLANNED' && item.date < todayStr)) return true;
+  
+  return false;
+};
+
 export function ClientList() {
   const { isVisible } = useVisibility();
   const [clients, setClients] = useState<Client[]>([]);
@@ -197,20 +209,28 @@ function ClientGridItem({ client, entries, onDelete }: { client: Client; entries
     <div className="relative group h-full">
       <Link 
         to={`/clientes/${client.id}`}
-        className="glass glass-hover p-6 rounded-3xl block h-full overflow-hidden"
+        className={cn(
+          "glass glass-hover p-6 rounded-3xl block h-full overflow-hidden transition-all duration-500",
+          isContentDelayed(client) && "border border-accent-coral/50 bg-accent-coral/[0.02]"
+        )}
       >
         <div className="flex items-start justify-between mb-8">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-black font-bold text-xl overflow-hidden" style={{ backgroundColor: client.brandColor }}>
-              {client.logo ? (
-                <img src={client.logo} alt={client.name} className="w-full h-full object-cover" />
-              ) : (
-                client.name.charAt(0)
+            <div className="relative shrink-0">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-black font-bold text-xl overflow-hidden" style={{ backgroundColor: client.brandColor }}>
+                {client.logo ? (
+                  <img src={client.logo} alt={client.name} className="w-full h-full object-cover" />
+                ) : (
+                  client.name.charAt(0)
+                )}
+              </div>
+              {isContentDelayed(client) && (
+                <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-accent-coral rounded-full border-2 border-bg-base animate-pulse shadow-[0_0_10px_rgba(255,77,77,0.8)]" />
               )}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-medium text-lg leading-none group-hover:text-accent-mint transition-colors">{client.name}</h3>
+                <h3 className={cn("font-medium text-lg leading-none transition-colors", isContentDelayed(client) ? "text-accent-coral font-bold" : "group-hover:text-accent-mint")}>{client.name}</h3>
                 <span className={cn(
                   "text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter",
                   client.billingModel === 'ONE_OFF' ? "bg-blue-400/10 text-blue-400" : "bg-accent-mint/10 text-accent-mint"
@@ -229,7 +249,7 @@ function ClientGridItem({ client, entries, onDelete }: { client: Client; entries
           <div className="flex flex-col items-end gap-2">
              <div className={cn(
                 "w-2 h-2 rounded-full",
-                health === 'GOOD' ? "bg-accent-mint shadow-[0_0_10px_#00D9A3]" : health === 'WARNING' ? "bg-accent-amber" : "bg-accent-coral shadow-[0_0_10px_#FF4D4D]"
+                isContentDelayed(client) ? "bg-accent-coral shadow-[0_0_10px_#FF4D4D] animate-pulse" : (health === 'GOOD' ? "bg-accent-mint shadow-[0_0_10px_#00D9A3]" : health === 'WARNING' ? "bg-accent-amber" : "bg-accent-coral shadow-[0_0_10px_#FF4D4D]")
              )} />
           </div>
         </div>
@@ -294,18 +314,26 @@ function ClientListItem({ client, entries, onDelete }: { client: Client; entries
     <div className="relative group">
       <Link 
         to={`/clientes/${client.id}`}
-        className="glass glass-hover px-6 py-4 rounded-xl flex items-center gap-6"
+        className={cn(
+          "glass glass-hover px-6 py-4 rounded-xl flex items-center gap-6 transition-all duration-500",
+          isContentDelayed(client) && "border border-accent-coral/50 bg-accent-coral/[0.02]"
+        )}
       >
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-black font-bold overflow-hidden shrink-0" style={{ backgroundColor: client.brandColor }}>
-          {client.logo ? (
-            <img src={client.logo} alt={client.name} className="w-full h-full object-cover" />
-          ) : (
-            client.name.charAt(0)
+        <div className="relative shrink-0">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-black font-bold overflow-hidden" style={{ backgroundColor: client.brandColor }}>
+            {client.logo ? (
+              <img src={client.logo} alt={client.name} className="w-full h-full object-cover" />
+            ) : (
+              client.name.charAt(0)
+            )}
+          </div>
+          {isContentDelayed(client) && (
+            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-accent-coral rounded-full border-2 border-bg-base animate-pulse shadow-[0_0_8px_rgba(255,77,77,0.8)]" />
           )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 truncate">
-            <h4 className="font-medium group-hover:text-accent-mint transition-colors">{client.name}</h4>
+            <h4 className={cn("font-medium transition-colors", isContentDelayed(client) ? "text-accent-coral font-bold" : "group-hover:text-accent-mint")}>{client.name}</h4>
             <span className={cn(
               "text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter shrink-0",
               client.billingModel === 'ONE_OFF' ? "bg-blue-400/10 text-blue-400" : "bg-accent-mint/10 text-accent-mint"

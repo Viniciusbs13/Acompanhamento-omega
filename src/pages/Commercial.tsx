@@ -134,6 +134,18 @@ export function Commercial() {
     let clientId = data.clientId;
     let clientName = '';
 
+    const newSale: Sale = {
+      id: Math.random().toString(36).substring(7),
+      clientId,
+      clientName,
+      service: data.service || '',
+      value: Number(data.value) || 0,
+      date: data.date || new Date().toISOString(),
+      status: (data.status as any) || 'PAID',
+      origin: data.origin || 'Instagram',
+      billingModel: (data.billingModel as any) || 'RECURRING'
+    };
+
     if (clientId === 'new') {
       const newClientId = Math.random().toString(36).substring(7);
       const newClient: Client = {
@@ -145,29 +157,19 @@ export function Commercial() {
         channels: [],
         createdAt: new Date().toISOString(),
         ownerNames: data.newClientName,
-        planScope: data.newClientContact, 
-        billingModel: data.contractType || 'RECURRING',
+        contactInfo: data.newClientContact as string,
+        planValue: Number(data.value) || 0,
+        billingModel: (data.billingModel as any) || 'RECURRING',
       };
       await storage.saveClient(newClient);
       setClients(prev => [...prev, newClient]);
-      clientId = newClientId;
-      clientName = data.newClientName;
+      newSale.clientId = newClientId;
+      newSale.clientName = data.newClientName;
     } else {
       const client = clients.find(c => c.id === clientId);
-      clientName = client?.name || 'Cliente Avulso';
+      newSale.clientName = client?.name || 'Cliente Avulso';
     }
 
-    const newSale: Sale = {
-      id: Math.random().toString(36).substring(7),
-      clientId,
-      clientName,
-      service: data.service || '',
-      value: Number(data.value) || 0,
-      date: data.date || new Date().toISOString(),
-      status: (data.status as any) || 'PAID',
-      origin: data.origin || 'Instagram',
-      billingModel: (data.billingModel as any) || (clients.find(c => c.id === clientId)?.billingModel) || 'RECURRING'
-    };
     await storage.saveSale(newSale);
     setSales(prev => [newSale, ...prev]);
     setShowAddSale(false);
@@ -531,18 +533,8 @@ export function Commercial() {
                         <input 
                           name="newClientContact" 
                           placeholder="WhatsApp ou Email"
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium mb-3" 
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" 
                         />
-                        <div className="grid grid-cols-2 gap-2">
-                           <label className="flex items-center gap-2 p-3 rounded-xl border border-white/10 bg-white/5 cursor-pointer hover:border-accent-mint/50 transition-colors">
-                              <input type="radio" name="contractType" value="RECURRING" defaultChecked className="accent-accent-mint" />
-                              <span className="text-[10px] font-bold uppercase tracking-widest">Mensal</span>
-                           </label>
-                           <label className="flex items-center gap-2 p-3 rounded-xl border border-white/10 bg-white/5 cursor-pointer hover:border-accent-mint/50 transition-colors">
-                              <input type="radio" name="contractType" value="ONE_OFF" className="accent-accent-mint" />
-                              <span className="text-[10px] font-bold uppercase tracking-widest">Único</span>
-                           </label>
-                        </div>
                       </div>
                    </div>
                 </div>

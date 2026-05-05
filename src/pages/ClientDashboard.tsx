@@ -6,7 +6,7 @@ import jsPDF from 'jspdf';
 import { 
   TrendingUp, TrendingDown, Clock, Plus, FileText, 
   BarChart3, Settings, Share2, Maximize2, Download,
-  ArrowRight, Users, CreditCard, DollarSign, Target, PlusCircle, Trash2, Edit2, ChevronDown, CheckCircle2, AlertCircle, Info, Minimize2, ExternalLink, Camera, CalendarDays
+  ArrowRight, Users, CreditCard, DollarSign, Target, PlusCircle, Trash2, Edit2, ChevronDown, CheckCircle2, AlertCircle, Info, Minimize2, ExternalLink, Camera, CalendarDays, Play, X, MessageSquare
 } from 'lucide-react';
 import { useEntries } from '../hooks/useMetrics';
 import { storage } from '../lib/storage';
@@ -80,9 +80,15 @@ const BUSINESS_CONFIGS: Record<string, any> = {
 };
 
 const isContentDelayed = (client: any) => {
-  if (!client.contentPlan || !client.contentPlan.items) return false;
-  const today = new Date().toISOString().split('T')[0];
-  return client.contentPlan.items.some((item: any) => item.status === 'PLANNED' && item.targetDate < today);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split('T')[0];
+
+  if (client.contentPlan?.items?.some((item: any) => item.status === 'PLANNED' && item.targetDate < todayStr)) return true;
+  if (client.captures?.some((item: any) => item.status === 'PLANNED' && item.date < todayStr)) return true;
+  if (client.meetings?.some((item: any) => item.status === 'PLANNED' && item.date < todayStr)) return true;
+  
+  return false;
 };
 
 export function ClientDashboard() {
@@ -1122,6 +1128,7 @@ export function ClientDashboard() {
                   accountManager: formData.get('accountManager') as string,
                   brandColor: formData.get('brandColor') as string,
                   ownerNames: formData.get('ownerNames') as string,
+                  contactInfo: formData.get('contactInfo') as string,
                   planValue: parseFloat(formData.get('planValue') as string) || 0,
                   planScope: formData.get('planScope') as string,
                   contractUrl: formData.get('contractUrl') as string,
@@ -1166,16 +1173,21 @@ export function ClientDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div>
-                      <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Donos / Sócios</label>
-                      <input name="ownerNames" defaultValue={client.ownerNames} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
-                   </div>
-                   <div>
-                      <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Valor do Plano (Mensal)</label>
-                      <input type="number" name="planValue" defaultValue={client.planValue} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
-                   </div>
-                </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                       <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Donos / Sócios</label>
+                       <input name="ownerNames" defaultValue={client.ownerNames} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
+                    </div>
+                    <div>
+                       <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Contato (WhatsApp/Email)</label>
+                       <input name="contactInfo" defaultValue={client.contactInfo} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
+                    </div>
+                 </div>
+
+                 <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Valor do Plano (Mensal)</label>
+                    <input type="number" name="planValue" defaultValue={client.planValue} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
+                 </div>
 
                 <div>
                    <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Escopo do Plano</label>
@@ -1219,7 +1231,7 @@ export function ClientDashboard() {
                            <div className="w-8 h-8 rounded-full bg-fuchsia-400/10 text-fuchsia-400 flex items-center justify-center text-xs font-bold shrink-0">
                               <Camera size={14} />
                            </div>
-                           <div className="flex-1 grid grid-cols-2 gap-2">
+                           <div className="flex-1 grid grid-cols-3 gap-2">
                              <div>
                                <label className="block text-[8px] font-bold text-text-muted uppercase mb-1">Título</label>
                                <input 
@@ -1245,6 +1257,23 @@ export function ClientDashboard() {
                                  }}
                                  className="bg-transparent text-xs font-medium text-white outline-none w-full"
                                />
+                             </div>
+                             <div className="flex flex-col justify-center">
+                               <label className="block text-[8px] font-bold text-text-muted uppercase mb-1">Tipo</label>
+                               <button
+                                 type="button"
+                                 onClick={() => {
+                                   const newCaps = [...client.captures];
+                                   newCaps[idx] = { ...newCaps[idx], isRecurring: !newCaps[idx].isRecurring };
+                                   setClient({ ...client, captures: newCaps });
+                                 }}
+                                 className={cn(
+                                   "text-[9px] font-bold uppercase py-1 px-2 rounded-lg border transition-all truncate",
+                                   item.isRecurring ? "bg-accent-mint/10 border-accent-mint text-accent-mint" : "bg-white/5 border-white/10 text-text-muted"
+                                 )}
+                               >
+                                 {item.isRecurring ? 'Recorr.' : 'Único'}
+                                </button>
                              </div>
                            </div>
                            <select 
@@ -1573,6 +1602,9 @@ export function ClientDashboard() {
 
 function DashboardCalendar({ client, setClient }: { client: any, setClient: any }) {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [showEventModal, setShowEventModal] = useState(false);
   
   const daysInMonth = useMemo(() => {
     const year = currentDate.getFullYear();
@@ -1607,19 +1639,55 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
   const getEventsForDate = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
     const events: any[] = [];
+    const isRecurringClient = client.billingModel === 'RECURRING';
     
     if (client.contentPlan?.items) {
       client.contentPlan.items.forEach((item: any) => {
-        if (item.targetDate === dateStr) {
-          events.push({ type: 'content', ...item });
+        const itemDate = new Date(item.targetDate + "T12:00:00");
+        const sameDayOfMonth = date.getDate() === itemDate.getDate();
+        
+        if (isRecurringClient) {
+          if (sameDayOfMonth) {
+            events.push({ type: 'content', ...item });
+          }
+        } else {
+          if (item.targetDate === dateStr) {
+            events.push({ type: 'content', ...item });
+          }
         }
       });
     }
     
     if (client.captures) {
       client.captures.forEach((cap: any) => {
-        if (cap.date === dateStr) {
-          events.push({ type: 'capture', ...cap });
+        const capDate = new Date(cap.date + "T12:00:00");
+        const sameDayOfMonth = date.getDate() === capDate.getDate();
+        
+        if (cap.isRecurring) {
+          if (sameDayOfMonth) {
+            events.push({ type: 'capture', ...cap });
+          }
+        } else {
+          if (cap.date === dateStr) {
+            events.push({ type: 'capture', ...cap });
+          }
+        }
+      });
+    }
+
+    if (client.meetings) {
+      client.meetings.forEach((meeting: any) => {
+        const meetDate = new Date(meeting.date + "T12:00:00");
+        const sameDayOfMonth = date.getDate() === meetDate.getDate();
+        
+        if (meeting.isRecurring) {
+          if (sameDayOfMonth) {
+            events.push({ type: 'meeting', ...meeting });
+          }
+        } else {
+          if (meeting.date === dateStr) {
+            events.push({ type: 'meeting', ...meeting });
+          }
         }
       });
     }
@@ -1627,17 +1695,142 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
     return events;
   };
 
+  const isEventDelayed = (event: any, date: Date) => {
+    if (event.status !== 'PLANNED') return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // For recurring items, we compare against the day of month, 
+    // but the intention is usually that it MUST be done by that day in the current month.
+    // If it's a past day in the current month and still PLANNED, it's delayed.
+    return date < today;
+  };
+
+  const handleDayClick = (date: Date) => {
+    setSelectedDay(date);
+    setSelectedEvent(null);
+    setShowEventModal(true);
+  };
+
+  const handleEventClick = async (e: React.MouseEvent, event: any) => {
+    e.stopPropagation();
+    
+    // Toggle status on single click
+    let updatedClient = { ...client };
+    if (event.type === 'content') {
+      const items = (updatedClient.contentPlan?.items || []).map((i: any) => 
+        i.id === event.id ? { ...i, status: i.status === 'POSTED' ? 'PLANNED' : 'POSTED' } : i
+      );
+      updatedClient = { ...updatedClient, contentPlan: { ...(updatedClient.contentPlan || { total: 0 }), items } };
+      toast.success(event.status === 'POSTED' ? 'Vídeo planejado' : 'Vídeo postado!');
+    } else if (event.type === 'capture') {
+      const captures = (updatedClient.captures || []).map((i: any) => 
+        i.id === event.id ? { ...i, status: i.status === 'DONE' ? 'PLANNED' : 'DONE' } : i
+      );
+      updatedClient = { ...updatedClient, captures };
+      toast.success(event.status === 'DONE' ? 'Captação pendente' : 'Captação concluída!');
+    } else if (event.type === 'meeting') {
+      const meetings = (updatedClient.meetings || []).map((i: any) => 
+        i.id === event.id ? { ...i, status: i.status === 'DONE' ? 'PLANNED' : 'DONE' } : i
+      );
+      updatedClient = { ...updatedClient, meetings };
+      toast.success(event.status === 'DONE' ? 'Reunião pendente' : 'Reunião concluída!');
+    }
+
+    setClient(updatedClient);
+    await storage.saveClient(updatedClient);
+  };
+
+  const handleEventDoubleClick = (e: React.MouseEvent, event: any) => {
+    e.stopPropagation();
+    setSelectedEvent(event);
+    setSelectedDay(new Date(event.targetDate || event.date));
+    setShowEventModal(true);
+  };
+
+  const handleSaveEvent = async (formData: FormData) => {
+    const type = formData.get('type') as string;
+    const title = formData.get('title') as string;
+    const notes = formData.get('notes') as string;
+    const isRecurring = formData.get('isRecurring') === 'on';
+    const dateStr = selectedDay?.toISOString().split('T')[0] || '';
+    
+    let updatedClient = { ...client };
+
+    if (selectedEvent) {
+      // Edit mode
+      if (selectedEvent.type === 'content') {
+        const items = (updatedClient.contentPlan?.items || []).map((i: any) => 
+          i.id === selectedEvent.id ? { ...i, title, notes, targetDate: dateStr } : i
+        );
+        updatedClient = { ...updatedClient, contentPlan: { ...(updatedClient.contentPlan || { total: 0 }), items } };
+      } else if (selectedEvent.type === 'capture') {
+        const captures = (updatedClient.captures || []).map((i: any) => 
+          i.id === selectedEvent.id ? { ...i, title, notes, date: dateStr, isRecurring } : i
+        );
+        updatedClient = { ...updatedClient, captures };
+      } else if (selectedEvent.type === 'meeting') {
+        const meetings = (updatedClient.meetings || []).map((i: any) => 
+          i.id === selectedEvent.id ? { ...i, title, notes, date: dateStr, isRecurring } : i
+        );
+        updatedClient = { ...updatedClient, meetings };
+      }
+    } else {
+      // Add mode
+      const newId = Math.random().toString(36).substring(7);
+      if (type === 'content') {
+        const currentContentPlan = updatedClient.contentPlan || { total: 0, items: [] };
+        const newItems = [...(currentContentPlan.items || []), { id: newId, targetDate: dateStr, title, notes, status: 'PLANNED' }];
+        updatedClient = { ...updatedClient, contentPlan: { ...currentContentPlan, items: newItems } };
+      } else if (type === 'capture') {
+        const captures = [...(updatedClient.captures || []), { id: newId, date: dateStr, title, notes, status: 'PLANNED', isRecurring }];
+        updatedClient = { ...updatedClient, captures };
+      } else if (type === 'meeting') {
+        const meetings = [...(updatedClient.meetings || []), { id: newId, date: dateStr, title, notes, status: 'PLANNED', isRecurring }];
+        updatedClient = { ...updatedClient, meetings };
+      }
+    }
+
+    setClient(updatedClient);
+    await storage.saveClient(updatedClient);
+    setShowEventModal(false);
+    toast.success(selectedEvent ? "Evento atualizado!" : "Evento adicionado!");
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!selectedEvent) return;
+    if (!window.confirm("Deseja apagar este evento?")) return;
+
+    let updatedClient = { ...client };
+    if (selectedEvent.type === 'content') {
+      const items = updatedClient.contentPlan.items.filter((i: any) => i.id !== selectedEvent.id);
+      updatedClient = { ...updatedClient, contentPlan: { ...updatedClient.contentPlan, items } };
+    } else if (selectedEvent.type === 'capture') {
+      const captures = updatedClient.captures.filter((i: any) => i.id !== selectedEvent.id);
+      updatedClient = { ...updatedClient, captures };
+    } else if (selectedEvent.type === 'meeting') {
+      const meetings = updatedClient.meetings.filter((i: any) => i.id !== selectedEvent.id);
+      updatedClient = { ...updatedClient, meetings };
+    }
+
+    setClient(updatedClient);
+    await storage.saveClient(updatedClient);
+    setShowEventModal(false);
+    toast.success("Evento removido!");
+  };
+
   return (
     <div className="glass rounded-3xl p-8 border border-white/5">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h3 className="text-xl font-medium capitalize">{monthName}</h3>
-          <p className="text-xs text-text-muted">Cronograma de postagens e gravações</p>
+          <p className="text-xs text-text-muted">Cronograma de postagens, gravações e reuniões</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-4 mr-4 text-[10px] font-bold uppercase tracking-widest text-text-muted">
              <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: client.brandColor }} /> Postagem</div>
              <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-fuchsia-400" /> Captação</div>
+             <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-400" /> Reunião</div>
           </div>
           <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
             <button 
@@ -1671,13 +1864,16 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
         {daysInMonth.map((dateObj, idx) => {
           const events = getEventsForDate(dateObj.date);
           const isToday = dateObj.date.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+          const hasDelayedEvent = events.some(e => isEventDelayed(e, dateObj.date));
           
           return (
             <div 
               key={idx} 
+              onClick={() => handleDayClick(dateObj.date)}
               className={cn(
-                "min-h-[100px] bg-bg-base/20 p-2 border-t border-white/[0.02] flex flex-col gap-1 transition-colors hover:bg-white/[0.03]",
-                dateObj.month !== 'current' && "opacity-20 pointer-events-none"
+                "min-h-[100px] bg-bg-base/20 p-2 border-t border-white/[0.02] flex flex-col gap-1 transition-colors hover:bg-white/[0.03] cursor-pointer",
+                dateObj.month !== 'current' && "opacity-20 pointer-events-none",
+                hasDelayedEvent && "border-2 border-accent-coral/50 bg-accent-coral/[0.02]"
               )}
             >
               <div className="flex justify-between items-center mb-1">
@@ -1691,44 +1887,147 @@ function DashboardCalendar({ client, setClient }: { client: any, setClient: any 
               </div>
               
               <div className="space-y-1">
-                {events.map((event: any) => (
-                  <button
-                    key={event.id}
-                    onClick={async () => {
-                       if (event.type === 'content') {
-                         const newItems = client.contentPlan.items.map((i: any) => 
-                           i.id === event.id ? { ...i, status: i.status === 'POSTED' ? 'PLANNED' : 'POSTED' } : i
-                         );
-                         const updated = { ...client, contentPlan: { ...client.contentPlan, items: newItems } };
-                         setClient(updated);
-                         await storage.saveClient(updated);
-                         toast.success(event.status === 'POSTED' ? 'Desmarcado' : 'Postado!');
-                       } else {
-                         const newCaps = client.captures.map((i: any) => 
-                           i.id === event.id ? { ...i, status: i.status === 'DONE' ? 'PLANNED' : 'DONE' } : i
-                         );
-                         const updated = { ...client, captures: newCaps };
-                         setClient(updated);
-                         await storage.saveClient(updated);
-                         toast.success(event.status === 'DONE' ? 'Pendente' : 'Concluído!');
-                       }
-                    }}
-                    className={cn(
-                      "w-full text-[8px] font-bold p-1 rounded-md border flex items-center gap-1 truncate text-left transition-all",
-                      event.type === 'content' 
-                        ? (event.status === 'POSTED' ? "bg-accent-mint/10 border-accent-mint/30 text-accent-mint" : "bg-white/5 border-white/10 text-white/50")
-                        : (event.status === 'DONE' ? "bg-fuchsia-400/20 border-fuchsia-400/30 text-fuchsia-400" : "bg-fuchsia-400/10 border-fuchsia-400/10 text-white/40")
-                    )}
-                  >
-                    {event.type === 'content' ? <Camera size={10} /> : <CalendarDays size={10} />}
-                    {event.title || 'Vídeo'}
-                  </button>
-                ))}
+                {events.map((event: any) => {
+                  const delayed = isEventDelayed(event, dateObj.date);
+                  return (
+                    <button
+                      key={event.id}
+                      onClick={(e) => handleEventClick(e, event)}
+                      onDoubleClick={(e) => handleEventDoubleClick(e, event)}
+                      className={cn(
+                        "w-full text-[8px] font-bold p-1 rounded-md border flex items-center gap-1 truncate text-left transition-all",
+                        delayed && "border-accent-coral shadow-[0_0_10px_rgba(255,77,77,0.2)]",
+                        event.type === 'content' 
+                          ? (event.status === 'POSTED' ? "bg-accent-mint/20 border-accent-mint/30 text-accent-mint" : (delayed ? "bg-accent-coral/10 text-accent-coral" : "bg-accent-mint/10 border-accent-mint/10 text-white/40"))
+                          : (event.type === 'capture' 
+                              ? (event.status === 'DONE' ? "bg-fuchsia-400/20 border-fuchsia-400/30 text-fuchsia-400" : (delayed ? "bg-accent-coral/10 text-accent-coral" : "bg-fuchsia-400/10 border-fuchsia-400/10 text-white/40"))
+                              : (event.status === 'DONE' ? "bg-blue-400/20 border-blue-400/30 text-blue-400" : (delayed ? "bg-accent-coral/10 text-accent-coral" : "bg-blue-400/10 border-blue-400/10 text-white/40"))
+                            )
+                      )}
+                    >
+                      {event.type === 'content' ? <Play size={10} /> : (event.type === 'capture' ? <Camera size={10} /> : <MessageSquare size={10} />)}
+                      <span className="flex-1 truncate">{event.title || (event.type === 'content' ? 'Vídeo' : (event.type === 'capture' ? 'Captação' : 'Reunião'))}</span>
+                      {((event.type === 'content' && client.billingModel === 'RECURRING') || event.isRecurring) && (
+                        <Clock size={8} className="opacity-60" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           );
         })}
       </div>
+
+      <AnimatePresence>
+        {showEventModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+             <motion.div 
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               exit={{ opacity: 0 }}
+               onClick={() => setShowEventModal(false)}
+               className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+             />
+             <motion.div 
+               initial={{ opacity: 0, scale: 0.95, y: 20 }}
+               animate={{ opacity: 1, scale: 1, y: 0 }}
+               exit={{ opacity: 0, scale: 0.95, y: 20 }}
+               className="relative w-full max-w-lg glass border border-white/10 rounded-3xl p-8 overflow-hidden shadow-2xl"
+             >
+                <div className="flex justify-between items-center mb-6">
+                   <div>
+                      <h4 className="text-xl font-medium">{selectedEvent ? 'Detalhes do Evento' : 'Agendar Evento'}</h4>
+                      <p className="text-xs text-text-muted mt-1 uppercase tracking-widest font-bold">
+                        {selectedDay?.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                      </p>
+                   </div>
+                   <button onClick={() => setShowEventModal(false)} className="text-text-muted hover:text-white transition-colors">
+                      <X size={20} />
+                   </button>
+                </div>
+
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSaveEvent(new FormData(e.currentTarget));
+                }} className="space-y-6">
+                   <div>
+                      <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-3">Tipo de Evento</label>
+                      <div className="grid grid-cols-3 gap-3">
+                         {[
+                           { id: 'content', label: 'Post/Vídeo', icon: Play, color: 'text-accent-mint' },
+                           { id: 'capture', label: 'Captação', icon: Camera, color: 'text-fuchsia-400' },
+                           { id: 'meeting', label: 'Reunião', icon: MessageSquare, color: 'text-blue-400' }
+                         ].map(t => (
+                           <label key={t.id} className={cn(
+                             "relative flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all cursor-pointer group",
+                             (selectedEvent?.type || 'content') === t.id ? "bg-white/10 border-white/20" : "bg-white/5 border-transparent opacity-50 hover:opacity-100"
+                           )}>
+                              <input type="radio" name="type" value={t.id} defaultChecked={(selectedEvent?.type || 'content') === t.id} className="absolute inset-0 opacity-0 cursor-pointer" />
+                              <t.icon size={20} className={t.color} />
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-center leading-tight">{t.label}</span>
+                           </label>
+                         ))}
+                      </div>
+                   </div>
+
+                   <div>
+                      <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Título do Evento</label>
+                      <input 
+                        name="title" 
+                        defaultValue={selectedEvent?.title}
+                        required
+                        placeholder="Ex: Vídeo de Reels, Captação na Sede..."
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" 
+                      />
+                   </div>
+
+                   <div>
+                      <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Informações Adicionais (Briefing/Pauta)</label>
+                      <textarea 
+                        name="notes" 
+                        defaultValue={selectedEvent?.notes}
+                        rows={4}
+                        placeholder="Adicione detalhes importantes aqui..."
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium resize-none text-sm" 
+                      />
+                   </div>
+
+                   <div className="flex items-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/5">
+                      <input 
+                        type="checkbox" 
+                        name="isRecurring" 
+                        id="isRecurring"
+                        defaultChecked={selectedEvent?.isRecurring || (selectedEvent?.type === 'content' && client.billingModel === 'RECURRING')}
+                        className="w-4 h-4 rounded border-white/10 bg-white/5 text-accent-mint focus:ring-accent-mint/50" 
+                      />
+                      <label htmlFor="isRecurring" className="text-[11px] font-bold uppercase tracking-wider text-text-muted cursor-pointer hover:text-white transition-colors">
+                        Evento Recorrente (Mesmo dia todo mês)
+                      </label>
+                   </div>
+
+                   <div className="flex gap-4 pt-4">
+                      {selectedEvent && (
+                        <button 
+                          type="button" 
+                          onClick={handleDeleteEvent}
+                          className="flex-1 px-6 py-4 bg-accent-coral/10 text-accent-coral rounded-xl text-sm font-bold border border-accent-coral/20 hover:bg-accent-coral/20 transition-all"
+                        >
+                          Apagar
+                        </button>
+                      )}
+                      <button 
+                        type="submit" 
+                        className="flex-[2] bg-accent-mint text-black font-bold px-8 py-4 rounded-xl hover:bg-accent-mint/90 transition-all shadow-lg shadow-accent-mint/10"
+                      >
+                         {selectedEvent ? 'Salvar Alterações' : 'Agendar Evento'}
+                      </button>
+                   </div>
+                </form>
+             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

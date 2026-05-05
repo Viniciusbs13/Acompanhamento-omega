@@ -35,6 +35,7 @@ const schema = z.object({
   adSpend: z.number().min(0).default(0),
   ticket: z.number().min(0).default(0),
   ownerNames: z.string().optional(),
+  contactInfo: z.string().optional(),
   planValue: z.number().min(0).default(0),
   planScope: z.string().optional(),
   contractUrl: z.string().optional(),
@@ -43,13 +44,25 @@ const schema = z.object({
   contentItems: z.array(z.object({
     id: z.string(),
     targetDate: z.string(),
+    title: z.string().optional(),
+    notes: z.string().optional(),
     status: z.enum(['PLANNED', 'POSTED']).default('PLANNED'),
   })).default([]),
   captures: z.array(z.object({
     id: z.string(),
     date: z.string(),
     title: z.string(),
+    notes: z.string().optional(),
     status: z.enum(['PLANNED', 'DONE']).default('PLANNED'),
+    isRecurring: z.boolean().default(false),
+  })).default([]),
+  meetings: z.array(z.object({
+    id: z.string(),
+    date: z.string(),
+    title: z.string(),
+    notes: z.string().optional(),
+    status: z.enum(['PLANNED', 'DONE']).default('PLANNED'),
+    isRecurring: z.boolean().default(false),
   })).default([]),
   billingModel: z.enum(['RECURRING', 'ONE_OFF']).default('RECURRING'),
 });
@@ -137,6 +150,7 @@ export function ClientNew() {
         createdAt: new Date().toISOString(),
         customFunnelSteps: customFunnelSteps,
         ownerNames: data.ownerNames,
+        contactInfo: data.contactInfo,
         planValue: data.planValue,
         planScope: data.planScope,
         contractUrl: data.contractUrl,
@@ -146,6 +160,7 @@ export function ClientNew() {
           items: data.contentItems || []
         },
         captures: data.captures || [],
+        meetings: data.meetings || [],
         managementStatus: 'GREEN',
         billingModel: data.billingModel,
       };
@@ -558,14 +573,22 @@ export function ClientNew() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Valor Total {watchBillingModel === 'RECURRING' ? 'do Plano (BRL)' : 'do Projeto (BRL)'}</label>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Contato (WhatsApp/Email)</label>
                   <input 
-                    type="number"
-                    {...register('planValue', { valueAsNumber: true })}
-                    placeholder="0.00"
+                    {...register('contactInfo')}
+                    placeholder="Ex: (11) 99999-9999"
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Valor Total {watchBillingModel === 'RECURRING' ? 'do Plano (BRL)' : 'do Projeto (BRL)'}</label>
+                <input 
+                  type="number"
+                  {...register('planValue', { valueAsNumber: true })}
+                  placeholder="0.00"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium"
+                />
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">O que está incluso no Plano (Escopo)</label>
@@ -620,7 +643,7 @@ export function ClientNew() {
                       <div className="w-8 h-8 rounded-full bg-fuchsia-400/10 text-fuchsia-400 flex items-center justify-center text-xs font-bold">
                         <Camera size={14} />
                       </div>
-                      <div className="flex-1 grid grid-cols-2 gap-4">
+                      <div className="flex-1 grid grid-cols-3 gap-4">
                         <div>
                           <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Título/Obs</label>
                           <input 
@@ -647,6 +670,23 @@ export function ClientNew() {
                             }}
                             className="bg-transparent text-sm font-medium outline-none text-white w-full"
                           />
+                        </div>
+                        <div className="flex flex-col justify-center">
+                          <label className="block text-[10px] font-bold text-text-muted uppercase mb-1">Tipo</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const current = getValues('captures');
+                              current[idx].isRecurring = !current[idx].isRecurring;
+                              setValue('captures', [...current]);
+                            }}
+                            className={cn(
+                              "text-[10px] font-bold uppercase py-1 px-3 rounded-xl border transition-all",
+                              item.isRecurring ? "bg-fuchsia-400/20 border-fuchsia-400 text-fuchsia-400" : "bg-white/5 border-white/10 text-text-muted"
+                            )}
+                          >
+                            {item.isRecurring ? 'Recorrente' : 'Único'}
+                          </button>
                         </div>
                       </div>
                       <button 
