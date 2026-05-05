@@ -382,11 +382,21 @@ export function Commercial() {
               {monthlySales.map((sale) => (
                 <tr key={sale.id} className="hover:bg-white/[0.02] transition-colors group">
                   <td className="px-8 py-6">
-                    <div className="flex items-center gap-3">
-                       <div className="w-8 h-8 rounded-lg bg-accent-mint/10 flex items-center justify-center text-accent-mint">
-                          <Users size={14} />
-                       </div>
-                       <span className="font-medium text-sm">{sale.clientName}</span>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-3">
+                         <div className="w-8 h-8 rounded-lg bg-accent-mint/10 flex items-center justify-center text-accent-mint">
+                            <Users size={14} />
+                         </div>
+                         <span className="font-medium text-sm">{sale.clientName}</span>
+                      </div>
+                      {clients.find(c => c.id === sale.clientId)?.billingModel && (
+                        <span className={cn(
+                          "text-[7px] font-bold uppercase tracking-tighter px-1.5 py-0.5 rounded w-fit mt-1 ml-11",
+                          clients.find(c => c.id === sale.clientId)?.billingModel === 'ONE_OFF' ? "bg-blue-400/10 text-blue-400" : "bg-accent-mint/10 text-accent-mint"
+                        )}>
+                          {clients.find(c => c.id === sale.clientId)?.billingModel === 'ONE_OFF' ? 'Único' : 'Mensal'}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-8 py-6 text-sm text-text-secondary">{sale.service}</td>

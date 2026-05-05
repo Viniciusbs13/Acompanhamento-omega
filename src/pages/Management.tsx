@@ -45,11 +45,15 @@ export function Management() {
     setLoading(false);
   };
 
-  const filteredClients = useMemo(() => {
-    return clients.filter(c => 
+  const categorizedClients = useMemo(() => {
+    const base = clients.filter(c => 
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (c.ownerNames?.toLowerCase().includes(searchTerm.toLowerCase()))
     );
+    return {
+      monthly: base.filter(c => c.billingModel !== 'ONE_OFF'),
+      single: base.filter(c => c.billingModel === 'ONE_OFF')
+    };
   }, [clients, searchTerm]);
 
   const stats = useMemo(() => {
@@ -133,107 +137,153 @@ export function Management() {
         />
       </div>
 
-      <div className="glass rounded-3xl overflow-hidden border border-white/5">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-white/[0.02] border-b border-white/5 text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                <th className="px-6 py-4">Cliente</th>
-                <th className="px-6 py-4">Dono / Sócios</th>
-                <th className="px-6 py-4">Gestor</th>
-                <th className="px-6 py-4">Valor do Plano</th>
-                <th className="px-6 py-4">Status / Flag</th>
-                <th className="px-6 py-4">Contrato</th>
-                <th className="px-6 py-4 text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {filteredClients.map((client) => (
-                <tr key={client.id} className="hover:bg-white/[0.01] transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-black shrink-0" style={{ backgroundColor: client.brandColor }}>
-                          {client.logo ? <img src={client.logo} className="w-full h-full object-cover rounded-lg" alt="" /> : client.name.charAt(0)}
-                        </div>
-                        {isContentDelayed(client) && (
-                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent-coral rounded-full border-2 border-bg-base animate-pulse shadow-[0_0_8px_rgba(255,77,77,0.8)]" />
-                        )}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className={cn("font-medium text-sm transition-colors", isContentDelayed(client) ? "text-accent-coral" : "text-white")}>{client.name}</span>
-                        {isContentDelayed(client) && (
-                          <span className="text-[8px] font-bold text-accent-coral uppercase leading-none mt-0.5">Postagem Atrasada</span>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-text-secondary italic">
-                    {client.ownerNames || 'Não informado'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={cn(
-                      "text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md",
-                      client.accountManager === 'Não tem gestor' ? "bg-accent-coral/10 text-accent-coral border border-accent-coral/20" : "bg-white/5 text-text-secondary"
-                    )}>
-                      {client.accountManager || 'Pendente'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">
-                          {isVisible ? formatCurrency(client.planValue || 0) : '•••••'}
-                        </span>
-                        <span className={cn(
-                          "text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter",
-                          client.billingModel === 'ONE_OFF' ? "bg-blue-400/10 text-blue-400 border border-blue-400/20" : "bg-accent-mint/10 text-accent-mint border border-accent-mint/20"
-                        )}>
-                          {client.billingModel === 'ONE_OFF' ? 'Projeto' : 'Mensal'}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-text-muted truncate max-w-[150px]">{client.planScope || 'Escopo básico'}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <StatusDropdown 
-                      status={client.managementStatus || 'GREEN'} 
-                      onChange={(s) => updateClientStatus(client.id, s)} 
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    {client.contractUrl ? (
-                      <a 
-                        href={client.contractUrl} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="flex items-center gap-2 text-accent-mint hover:underline text-xs font-medium"
-                      >
-                        <FileText size={14} /> Link do Contrato
-                      </a>
-                    ) : (
-                      <span className="text-xs text-text-muted">Sem link</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <Link to={`/clientes/${client.id}`} className="p-2 hover:bg-white/5 rounded-lg inline-block text-text-muted hover:text-white transition-colors">
-                      <ExternalLink size={16} />
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-              {filteredClients.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-20 text-center">
-                    <p className="text-text-muted italic">Nenhum cliente encontrado.</p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="space-y-12">
+        {categorizedClients.monthly.length > 0 && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-accent-mint" />
+              <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Planos Mensais</h3>
+            </div>
+            <div className="glass rounded-3xl overflow-hidden border border-white/5">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-white/[0.02] border-b border-white/5 text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                      <th className="px-6 py-4">Cliente</th>
+                      <th className="px-6 py-4">Dono / Sócios</th>
+                      <th className="px-6 py-4">Gestor</th>
+                      <th className="px-6 py-4">Valor do Plano</th>
+                      <th className="px-6 py-4">Status / Flag</th>
+                      <th className="px-6 py-4">Contrato</th>
+                      <th className="px-6 py-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {categorizedClients.monthly.map((client) => (
+                      <ClientRow key={client.id} client={client} updateStatus={updateClientStatus} isVisible={isVisible} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {categorizedClients.single.length > 0 && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+              <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Trabalhos Únicos</h3>
+            </div>
+            <div className="glass rounded-3xl overflow-hidden border border-white/5">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-white/[0.02] border-b border-white/5 text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                      <th className="px-6 py-4">Cliente</th>
+                      <th className="px-6 py-4">Dono / Sócios</th>
+                      <th className="px-6 py-4">Gestor</th>
+                      <th className="px-6 py-4">Valor do Trabalho</th>
+                      <th className="px-6 py-4">Status / Flag</th>
+                      <th className="px-6 py-4">Contrato</th>
+                      <th className="px-6 py-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {categorizedClients.single.map((client) => (
+                      <ClientRow key={client.id} client={client} updateStatus={updateClientStatus} isVisible={isVisible} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {categorizedClients.monthly.length === 0 && categorizedClients.single.length === 0 && (
+          <div className="py-20 text-center glass rounded-3xl border-dashed">
+            <p className="text-text-muted italic">Nenhum cliente encontrado.</p>
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+function ClientRow({ client, updateStatus, isVisible }: any) {
+  return (
+    <tr key={client.id} className="hover:bg-white/[0.01] transition-colors group">
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-black shrink-0" style={{ backgroundColor: client.brandColor }}>
+              {client.logo ? <img src={client.logo} className="w-full h-full object-cover rounded-lg" alt="" /> : client.name.charAt(0)}
+            </div>
+            {isContentDelayed(client) && (
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent-coral rounded-full border-2 border-bg-base animate-pulse shadow-[0_0_8px_rgba(255,77,77,0.8)]" />
+            )}
+          </div>
+          <div className="flex flex-col">
+            <span className={cn("font-medium text-sm transition-colors", isContentDelayed(client) ? "text-accent-coral" : "text-white")}>{client.name}</span>
+            {isContentDelayed(client) && (
+              <span className="text-[8px] font-bold text-accent-coral uppercase leading-none mt-0.5">Postagem Atrasada</span>
+            )}
+          </div>
+        </div>
+      </td>
+      <td className="px-6 py-4 text-sm text-text-secondary italic">
+        {client.ownerNames || 'Não informado'}
+      </td>
+      <td className="px-6 py-4">
+        <span className={cn(
+          "text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md",
+          client.accountManager === 'Não tem gestor' ? "bg-accent-coral/10 text-accent-coral border border-accent-coral/20" : "bg-white/5 text-text-secondary"
+        )}>
+          {client.accountManager || 'Pendente'}
+        </span>
+      </td>
+      <td className="px-6 py-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">
+              {isVisible ? formatCurrency(client.planValue || 0) : '•••••'}
+            </span>
+            <span className={cn(
+              "text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter",
+              client.billingModel === 'ONE_OFF' ? "bg-blue-400/10 text-blue-400 border border-blue-400/20" : "bg-accent-mint/10 text-accent-mint border border-accent-mint/20"
+            )}>
+              {client.billingModel === 'ONE_OFF' ? 'Projeto' : 'Mensal'}
+            </span>
+          </div>
+          <span className="text-[10px] text-text-muted truncate max-w-[150px]">{client.planScope || 'Escopo básico'}</span>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <StatusDropdown 
+          status={client.managementStatus || 'GREEN'} 
+          onChange={(s) => updateStatus(client.id, s)} 
+        />
+      </td>
+      <td className="px-6 py-4">
+        {client.contractUrl ? (
+          <a 
+            href={client.contractUrl} 
+            target="_blank" 
+            rel="noreferrer"
+            className="flex items-center gap-2 text-accent-mint hover:underline text-xs font-medium"
+          >
+            <FileText size={14} /> Link do Contrato
+          </a>
+        ) : (
+          <span className="text-xs text-text-muted">Sem link</span>
+        )}
+      </td>
+      <td className="px-6 py-4 text-right">
+        <Link to={`/clientes/${client.id}`} className="p-2 hover:bg-white/5 rounded-lg inline-block text-text-muted hover:text-white transition-colors">
+          <ExternalLink size={16} />
+        </Link>
+      </td>
+    </tr>
   );
 }
 

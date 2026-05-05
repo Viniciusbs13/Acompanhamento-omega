@@ -209,8 +209,16 @@ function ClientGridItem({ client, entries, onDelete }: { client: Client; entries
               )}
             </div>
             <div>
-              <h3 className="font-medium text-lg leading-none mb-1 group-hover:text-accent-mint transition-colors">{client.name}</h3>
-              <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <h3 className="font-medium text-lg leading-none group-hover:text-accent-mint transition-colors">{client.name}</h3>
+                <span className={cn(
+                  "text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter",
+                  client.billingModel === 'ONE_OFF' ? "bg-blue-400/10 text-blue-400" : "bg-accent-mint/10 text-accent-mint"
+                )}>
+                  {client.billingModel === 'ONE_OFF' ? 'Único' : 'Mensal'}
+                </span>
+              </div>
+              <div className="flex flex-col mt-1">
                 <span className="text-[10px] text-text-muted font-bold uppercase tracking-widest">{client.businessType}</span>
                 {client.accountManager && (
                   <span className="text-[9px] text-accent-mint/70 font-medium">Gestor: {client.accountManager}</span>
@@ -296,7 +304,15 @@ function ClientListItem({ client, entries, onDelete }: { client: Client; entries
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium group-hover:text-accent-mint transition-colors truncate">{client.name}</h4>
+          <div className="flex items-center gap-2 truncate">
+            <h4 className="font-medium group-hover:text-accent-mint transition-colors">{client.name}</h4>
+            <span className={cn(
+              "text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter shrink-0",
+              client.billingModel === 'ONE_OFF' ? "bg-blue-400/10 text-blue-400" : "bg-accent-mint/10 text-accent-mint"
+            )}>
+              {client.billingModel === 'ONE_OFF' ? 'Único' : 'Mensal'}
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             <p className="text-[10px] text-text-muted uppercase font-bold tracking-widest">{client.businessType}</p>
             {client.accountManager && (

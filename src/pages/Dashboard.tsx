@@ -292,7 +292,15 @@ function GlobalClientCard({ client, index, entries }: any) {
             )}
           </div>
           <div>
-            <h4 className={cn("font-medium transition-colors", isContentDelayed(client) ? "text-accent-coral font-bold" : "group-hover:text-accent-mint")}>{client.name}</h4>
+            <div className="flex items-center gap-2">
+              <h4 className={cn("font-medium transition-colors", isContentDelayed(client) ? "text-accent-coral font-bold" : "group-hover:text-accent-mint")}>{client.name}</h4>
+              <span className={cn(
+                "text-[8px] px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter",
+                client.billingModel === 'ONE_OFF' ? "bg-blue-400/10 text-blue-400" : "bg-accent-mint/10 text-accent-mint"
+              )}>
+                {client.billingModel === 'ONE_OFF' ? 'Único' : 'Mensal'}
+              </span>
+            </div>
             <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">{client.businessType.replace('_', ' ')}</p>
           </div>
         </div>
