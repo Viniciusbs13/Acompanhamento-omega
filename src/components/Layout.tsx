@@ -124,9 +124,9 @@ export function Layout() {
           </div>
 
           <div className="hidden md:flex items-center gap-2 text-xs font-medium text-text-muted uppercase tracking-widest">
-            <span>Home</span>
+            <span>Início</span>
             <ChevronRight size={12} />
-            <span className="text-text-secondary">{location.pathname.split('/')[1]?.replace('-', ' ') || 'Dashboard'}</span>
+            <span className="text-text-secondary">{location.pathname.split('/')[1]?.replace('-', ' ') === 'dashboard' ? 'Painel' : location.pathname.split('/')[1]?.replace('-', ' ')}</span>
           </div>
 
           <div className="flex-1" />
@@ -144,7 +144,7 @@ export function Layout() {
               className="px-4 py-2 bg-accent-mint text-black font-semibold rounded-lg text-sm flex items-center gap-2 hover:bg-accent-mint/90 transition-all shadow-lg shadow-accent-mint/10"
             >
               <Plus size={16} />
-              <span className="hidden sm:inline">Novo Lançamento</span>
+              <span className="hidden sm:inline">Novo Cliente</span>
             </Link>
             <button 
               onClick={toggleVisibility}
