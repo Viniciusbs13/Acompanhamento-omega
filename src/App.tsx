@@ -9,6 +9,7 @@ import { Toaster } from 'sonner';
 import { Layout } from './components/Layout';
 import { LoginPage } from './pages/LoginPage';
 import { Dashboard } from './pages/Dashboard';
+import { Demands } from './pages/Demands';
 import { ClientList } from './pages/ClientList';
 import { ClientNew } from './pages/ClientNew';
 import { ClientDashboard } from './pages/ClientDashboard';
@@ -45,6 +46,7 @@ export default function App() {
             <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
+              <Route path="/demandas" element={<ErrorBoundary><Demands /></ErrorBoundary>} />
               <Route path="/clientes" element={<ErrorBoundary><ClientList /></ErrorBoundary>} />
               <Route path="/clientes/novo" element={<ErrorBoundary><ClientNew /></ErrorBoundary>} />
               <Route path="/clientes/:id" element={<ErrorBoundary><ClientDashboard /></ErrorBoundary>} />

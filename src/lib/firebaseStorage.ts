@@ -169,6 +169,18 @@ export const firebaseStorage = {
     }
   },
 
+  listenToClients: (callback: (clients: Client[]) => void) => {
+    if (!auth.currentUser) return () => {};
+    const path = CLIENTS_COL;
+    const q = query(collection(db, path), where('ownerId', '==', auth.currentUser.uid));
+    return onSnapshot(q, (snapshot) => {
+      const clients = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Client));
+      callback(clients);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    });
+  },
+
   // Entries
   getEntries: async (clientId: string): Promise<MetricEntry[]> => {
     if (!auth.currentUser) return [];

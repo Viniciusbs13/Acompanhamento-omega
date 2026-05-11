@@ -13,7 +13,8 @@ import {
   Briefcase,
   Eye,
   EyeOff,
-  DollarSign
+  DollarSign,
+  Calendar
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { cn } from '../lib/utils';
@@ -52,6 +53,7 @@ export function Layout() {
 
   const navItems = [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    { label: 'Demandas', icon: Calendar, path: '/demandas' },
     { label: 'Clientes', icon: Users, path: '/clientes' },
     { label: 'Comercial', icon: DollarSign, path: '/comercial' },
     { label: 'Gestão de Carteira', icon: Briefcase, path: '/gestao' },

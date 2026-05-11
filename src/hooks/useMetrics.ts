@@ -6,27 +6,24 @@ export function useClients() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const refresh = async () => {
-    const data = await storage.getClients();
-    setClients(data);
-    setLoading(false);
-  };
-
   useEffect(() => {
-    refresh();
+    setLoading(true);
+    const unsubscribe = storage.listenToClients((data) => {
+      setClients(data);
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   const addClient = async (client: Client) => {
     await storage.saveClient(client);
-    await refresh();
   };
 
   const removeClient = async (id: string) => {
     await storage.deleteClient(id);
-    await refresh();
   };
 
-  return { clients, loading, addClient, removeClient, refresh };
+  return { clients, loading, addClient, removeClient };
 }
 
 export function useEntries(clientId: string) {

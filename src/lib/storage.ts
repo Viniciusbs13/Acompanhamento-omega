@@ -14,6 +14,10 @@ export const storage = {
     await firebaseStorage.deleteClient(id);
   },
 
+  listenToClients: (callback: (clients: Client[]) => void) => {
+    return firebaseStorage.listenToClients(callback);
+  },
+
   getEntries: async (clientId: string): Promise<MetricEntry[]> => {
     return await firebaseStorage.getEntries(clientId);
   },
