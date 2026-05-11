@@ -79,14 +79,96 @@ const BUSINESS_CONFIGS: Record<string, any> = {
   }
 };
 
-const isContentDelayed = (client: any) => {
+const isContentDelayed = (client: any, refDate: Date = new Date()) => {
   const today = new Date();
+  const realCurrentMonth = today.getMonth();
+  const realCurrentYear = today.getFullYear();
+  
+  const currentMonth = refDate.getMonth();
+  const currentYear = refDate.getFullYear();
+
+  // ONLY red for the current real-world month
+  if (currentMonth !== realCurrentMonth || currentYear !== realCurrentYear) {
+    return false;
+  }
+  
   today.setHours(0, 0, 0, 0);
   const todayStr = today.toISOString().split('T')[0];
 
-  if (client.contentPlan?.items?.some((item: any) => item.status === 'PLANNED' && item.targetDate < todayStr)) return true;
-  if (client.captures?.some((item: any) => item.status === 'PLANNED' && item.date < todayStr)) return true;
-  if (client.meetings?.some((item: any) => item.status === 'PLANNED' && item.date < todayStr)) return true;
+  const isInMonth = (dateStr: string) => {
+    const d = new Date(dateStr + "T12:00:00");
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  };
+
+  const isRecurringClient = client.billingModel === 'RECURRING';
+
+  // Check Content
+  if (client.contentPlan?.items?.some((item: any) => {
+    const isRecurring = item.recurrenceType 
+      ? item.recurrenceType !== 'NONE'
+      : (item.isRecurring || (item.recurringDays && item.recurringDays.length > 0) || (isRecurringClient && !item.recurringDays));
+
+    if (isRecurring) {
+      // Check days in the month up to the reference date (or today if reference is current month)
+      // Actually, we only care about delays relative to "today".
+      // If we are looking at a past month, we check the whole month.
+      // If we are looking at future month, no delays.
+      // If we are looking at current month, we check up to yesterday.
+      
+      const isPastMonth = (currentYear < today.getFullYear()) || (currentYear === today.getFullYear() && currentMonth < today.getMonth());
+      const isCurrentMonth = (currentYear === today.getFullYear() && currentMonth === today.getMonth());
+      const isFutureMonth = (currentYear > today.getFullYear()) || (currentYear === today.getFullYear() && currentMonth > today.getMonth());
+
+      if (isFutureMonth) return false;
+
+      const lastDayToCheck = isCurrentMonth ? today.getDate() - 1 : new Date(currentYear, currentMonth + 1, 0).getDate();
+      
+      for (let d = 1; d <= lastDayToCheck; d++) {
+        const checkDate = new Date(currentYear, currentMonth, d);
+        const checkDateStr = checkDate.toISOString().split('T')[0];
+        
+        const dateOccurs = (date: Date, evt: any) => {
+          const rType = evt.recurrenceType || (evt.isRecurring ? 'MONTHLY_DAY' : (evt.recurringDays && evt.recurringDays.length > 0) ? 'WEEKLY' : 'NONE');
+          const effectiveR = (evt.type === 'content' && isRecurringClient && rType === 'NONE' && evt.isRecurring === undefined) ? 'MONTHLY_DAY' : rType;
+          if (evt.deletedDates?.includes(checkDateStr)) return false;
+
+          switch (effectiveR) {
+            case 'DAILY': return true;
+            case 'WEEKLY': return evt.recurringDays?.includes(date.getDay());
+            case 'MONTHLY_DAY': return date.getDate() === new Date((evt.targetDate || evt.date) + "T12:00:00").getDate();
+            case 'MONTHLY_ORDINAL': {
+              if (!evt.ordinalWeekday) return false;
+              const { ordinal, day } = evt.ordinalWeekday;
+              if (date.getDay() !== day) return false;
+              return Math.ceil(date.getDate() / 7) === ordinal;
+            }
+            default: return false;
+          }
+        };
+
+        if (dateOccurs(checkDate, { ...item, type: 'content' }) && !item.completedDates?.includes(checkDateStr)) {
+          return true;
+        }
+      }
+      return false;
+    } else {
+      const itemDate = item.targetDate || item.date;
+      return item.status === 'PLANNED' && itemDate < todayStr && isInMonth(itemDate);
+    }
+  })) return true;
+
+  // Check Captures/Meetings (similar logic)
+  if (client.captures?.some((item: any) => {
+    const itemDate = item.date;
+    if (item.isRecurring) return false;
+    return item.status === 'PLANNED' && itemDate < todayStr && isInMonth(itemDate);
+  })) return true;
+
+  if (client.meetings?.some((item: any) => {
+    const itemDate = item.date;
+    if (item.isRecurring) return false;
+    return item.status === 'PLANNED' && itemDate < todayStr && isInMonth(itemDate);
+  })) return true;
   
   return false;
 };
@@ -468,8 +550,8 @@ export function ClientDashboard() {
           <div className="space-y-1">
             <div className="flex items-center gap-3">
               <h1 className="text-4xl font-medium tracking-tight">{client.name}</h1>
-              <HealthBadge status={isContentDelayed(client) ? 'CRITICAL' : health} />
-              {isContentDelayed(client) && (
+              <HealthBadge status={isContentDelayed(client, currentDate) ? 'CRITICAL' : health} />
+              {isContentDelayed(client, currentDate) && (
                 <div className="bg-accent-coral/20 border border-accent-coral/30 px-3 py-1 rounded-full text-accent-coral text-[10px] font-bold uppercase animate-pulse">
                    Conteúdo Atrasado
                 </div>
@@ -514,14 +596,14 @@ export function ClientDashboard() {
                 "flex items-center gap-2 px-6 py-4 text-sm font-medium transition-all relative border-b-2",
                 activeTab === tab.id 
                   ? "text-accent-mint border-accent-mint" 
-                  : tab.id === 'calendar' && isContentDelayed(client)
+                  : tab.id === 'calendar' && isContentDelayed(client, currentDate)
                     ? "text-accent-coral border-transparent animate-pulse"
                     : "text-text-muted border-transparent hover:text-text-secondary"
               )}
             >
               <tab.icon size={16} />
               {tab.label}
-              {tab.id === 'calendar' && isContentDelayed(client) && (
+              {tab.id === 'calendar' && isContentDelayed(client, currentDate) && (
                 <div className="w-2 h-2 rounded-full bg-accent-coral shadow-[0_0_8px_rgba(255,77,77,0.6)] animate-pulse" />
               )}
             </button>
@@ -549,7 +631,7 @@ export function ClientDashboard() {
                     label="Vídeos" 
                     value={monthStats.posted} 
                     suffix={`/ ${monthStats.total}`} 
-                    color={isContentDelayed(client) ? 'text-accent-coral shadow-[0_0_15px_rgba(255,77,77,0.2)]' : undefined}
+                    color={isContentDelayed(client, currentDate) ? 'text-accent-coral shadow-[0_0_15px_rgba(255,77,77,0.2)]' : undefined}
                   />
                   <ClientKPICard label="Vendas" value={lastEntry?.sales || 0} color="text-accent-mint" />
                   <ClientKPICard label="CPL" value={metrics?.cpl || 0} isCurrency color="text-accent-coral" />
@@ -563,7 +645,7 @@ export function ClientDashboard() {
                     label="Vídeos" 
                     value={monthStats.posted} 
                     suffix={`/ ${monthStats.total}`} 
-                    color={isContentDelayed(client) ? 'text-accent-coral shadow-[0_0_15px_rgba(255,77,77,0.2)]' : undefined}
+                    color={isContentDelayed(client, currentDate) ? 'text-accent-coral shadow-[0_0_15px_rgba(255,77,77,0.2)]' : undefined}
                   />
                   {!config.hideCac && <ClientKPICard label="CAC" value={metrics?.cac || 0} isCurrency color="text-accent-coral" />}
                   <ClientKPICard label="ROAS" value={metrics?.roas || 0} isDecimal />
@@ -577,18 +659,18 @@ export function ClientDashboard() {
                 {client.contentPlan && (
                   <div className={cn(
                     "glass rounded-3xl p-6 flex flex-col justify-between relative overflow-hidden group transition-all duration-500",
-                    isContentDelayed(client) && "border border-accent-coral/50 bg-accent-coral/[0.02]"
+                    isContentDelayed(client, currentDate) && "border border-accent-coral/50 bg-accent-coral/[0.02]"
                   )}>
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Conteúdo</h3>
-                        <p className={cn("text-xs", isContentDelayed(client) ? "text-accent-coral font-bold" : "text-text-secondary")}>
-                          {isContentDelayed(client) ? 'Atenção: Atrasadas!' : 'Status mensal'}
+                        <p className={cn("text-xs", isContentDelayed(client, currentDate) ? "text-accent-coral font-bold" : "text-text-secondary")}>
+                          {isContentDelayed(client, currentDate) ? 'Atenção: Atrasadas!' : 'Status mensal'}
                         </p>
                       </div>
                       <div className={cn(
                         "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
-                        isContentDelayed(client) ? "bg-accent-coral/20 text-accent-coral" : "bg-accent-mint/10 text-accent-mint"
+                        isContentDelayed(client, currentDate) ? "bg-accent-coral/20 text-accent-coral" : "bg-accent-mint/10 text-accent-mint"
                       )}>
                         <Camera size={20} />
                       </div>
@@ -602,7 +684,7 @@ export function ClientDashboard() {
                           </span>
                           <span className="text-xl font-light text-text-muted"> / {monthStats.total}</span>
                         </div>
-                        <span className={cn("text-[10px] font-bold uppercase", isContentDelayed(client) ? "text-accent-coral" : "text-accent-mint")}>
+                        <span className={cn("text-[10px] font-bold uppercase", isContentDelayed(client, currentDate) ? "text-accent-coral" : "text-accent-mint")}>
                           {Math.round((monthStats.posted / (monthStats.total || 1)) * 100)}%
                         </span>
                       </div>
@@ -613,7 +695,7 @@ export function ClientDashboard() {
                           animate={{ width: `${Math.min(100, (monthStats.posted / (monthStats.total || 1)) * 100)}%` }}
                           className={cn(
                             "h-full transition-all shadow-[0_0_15px_rgba(0,0,0,0.2)]",
-                            isContentDelayed(client) ? "bg-accent-coral shadow-accent-coral/30" : "bg-accent-mint shadow-accent-mint/30"
+                            isContentDelayed(client, currentDate) ? "bg-accent-coral shadow-accent-coral/30" : "bg-accent-mint shadow-accent-mint/30"
                           )}
                         />
                       </div>
@@ -1811,8 +1893,13 @@ function DashboardCalendar({
 
     if (isCompleted) return false;
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
     
+    // ONLY show as delayed if it's in the current real-world month
+    if (date.getMonth() !== today.getMonth() || date.getFullYear() !== today.getFullYear()) {
+      return false;
+    }
+
+    today.setHours(0, 0, 0, 0);
     return date < today;
   };
 

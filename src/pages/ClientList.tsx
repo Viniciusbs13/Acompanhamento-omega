@@ -11,12 +11,75 @@ import { toast } from 'sonner';
 
 const isContentDelayed = (client: any) => {
   const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
   today.setHours(0, 0, 0, 0);
   const todayStr = today.toISOString().split('T')[0];
 
-  if (client.contentPlan?.items?.some((item: any) => item.status === 'PLANNED' && item.targetDate < todayStr)) return true;
-  if (client.captures?.some((item: any) => item.status === 'PLANNED' && item.date < todayStr)) return true;
-  if (client.meetings?.some((item: any) => item.status === 'PLANNED' && item.date < todayStr)) return true;
+  const isInMonth = (dateStr: string) => {
+    const d = new Date(dateStr + "T12:00:00");
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  };
+
+  const isRecurringClient = client.billingModel === 'RECURRING';
+
+  // Check Content
+  if (client.contentPlan?.items?.some((item: any) => {
+    const isRecurring = item.recurrenceType 
+      ? item.recurrenceType !== 'NONE'
+      : (item.isRecurring || (item.recurringDays && item.recurringDays.length > 0) || (isRecurringClient && !item.recurringDays));
+
+    if (isRecurring) {
+      // Check days in current month up to yesterday
+      const lastDayToCheck = today.getDate() - 1;
+      if (lastDayToCheck < 1) return false;
+      
+      for (let d = 1; d <= lastDayToCheck; d++) {
+        const checkDate = new Date(currentYear, currentMonth, d);
+        const checkDateStr = checkDate.toISOString().split('T')[0];
+        
+        const dateOccurs = (date: Date, evt: any) => {
+          const rType = evt.recurrenceType || (evt.isRecurring ? 'MONTHLY_DAY' : (evt.recurringDays && evt.recurringDays.length > 0) ? 'WEEKLY' : 'NONE');
+          const effectiveR = (evt.type === 'content' && isRecurringClient && rType === 'NONE' && evt.isRecurring === undefined) ? 'MONTHLY_DAY' : rType;
+          if (evt.deletedDates?.includes(checkDateStr)) return false;
+
+          switch (effectiveR) {
+            case 'DAILY': return true;
+            case 'WEEKLY': return evt.recurringDays?.includes(date.getDay());
+            case 'MONTHLY_DAY': return date.getDate() === new Date((evt.targetDate || evt.date) + "T12:00:00").getDate();
+            case 'MONTHLY_ORDINAL': {
+              if (!evt.ordinalWeekday) return false;
+              const { ordinal, day } = evt.ordinalWeekday;
+              if (date.getDay() !== day) return false;
+              return Math.ceil(date.getDate() / 7) === ordinal;
+            }
+            default: return false;
+          }
+        };
+
+        if (dateOccurs(checkDate, { ...item, type: 'content' }) && !item.completedDates?.includes(checkDateStr)) {
+          return true;
+        }
+      }
+      return false;
+    } else {
+      const itemDate = item.targetDate || item.date;
+      return item.status === 'PLANNED' && itemDate < todayStr && isInMonth(itemDate);
+    }
+  })) return true;
+
+  // Check Captures/Meetings (similar logic)
+  if (client.captures?.some((item: any) => {
+    const itemDate = item.date;
+    if (item.isRecurring) return false;
+    return item.status === 'PLANNED' && itemDate < todayStr && isInMonth(itemDate);
+  })) return true;
+
+  if (client.meetings?.some((item: any) => {
+    const itemDate = item.date;
+    if (item.isRecurring) return false;
+    return item.status === 'PLANNED' && itemDate < todayStr && isInMonth(itemDate);
+  })) return true;
   
   return false;
 };
