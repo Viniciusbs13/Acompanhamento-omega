@@ -185,6 +185,7 @@ export interface CommercialGoal {
   year: number;
   target: number;
   ownerId?: string;
+  notes?: string;
 }
 
 export interface CommercialMetrics {

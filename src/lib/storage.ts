@@ -18,6 +18,10 @@ export const storage = {
     return firebaseStorage.listenToClients(callback);
   },
 
+  listenToAllEntries: (callback: (entries: MetricEntry[]) => void) => {
+    return firebaseStorage.listenToAllEntries(callback);
+  },
+
   getEntries: async (clientId: string): Promise<MetricEntry[]> => {
     return await firebaseStorage.getEntries(clientId);
   },

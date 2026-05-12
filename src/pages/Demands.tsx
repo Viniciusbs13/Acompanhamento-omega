@@ -25,7 +25,9 @@ import {
   Trash2,
   ArrowRight,
   DollarSign,
-  Zap
+  Zap,
+  BarChart2,
+  FileText
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { storage } from '../lib/storage';
@@ -66,6 +68,8 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
+import { PerformanceReportModal } from '../components/PerformanceReportModal';
+
 type ViewMode = 'day' | 'week' | 'month';
 type DemandStatus = 'PENDENTE' | 'EM_ANDAMENTO' | 'AGUARDANDO_APROVACAO' | 'CONCLUIDO' | 'ATRASADO';
 type DemandPriority = 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE';
@@ -88,7 +92,7 @@ interface DemandItem {
 
 export function Demands() {
   const [clients, setClients] = useState<Client[]>([]);
-  const [entries, setEntries] = useState<Record<string, MetricEntry[]>>({});
+  const [allEntries, setAllEntries] = useState<MetricEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -96,24 +100,25 @@ export function Demands() {
   const [statusFilter, setStatusFilter] = useState<DemandStatus | 'ALL'>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<DemandPriority | 'ALL'>('ALL');
   const [responsibleFilter, setResponsibleFilter] = useState<string | 'ALL'>('ALL');
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    const unsubscribe = storage.listenToClients(async (allClients) => {
+    const unsubClients = storage.listenToClients((allClients) => {
       setClients(allClients);
-      
-      // Fetch entries for all clients to calculate financial metrics
-      const entriesMap: Record<string, MetricEntry[]> = {};
-      await Promise.all(allClients.map(async (client) => {
-        const clientEntries = await storage.getEntries(client.id);
-        entriesMap[client.id] = clientEntries;
-      }));
-      setEntries(entriesMap);
-      
+      if (allEntries.length > 0) setLoading(false);
+    });
+
+    const unsubEntries = storage.listenToAllEntries((entries) => {
+      setAllEntries(entries);
       setLoading(false);
     });
-    return () => unsubscribe();
-  }, []);
+
+    return () => {
+      unsubClients();
+      unsubEntries();
+    };
+  }, [allEntries.length]);
 
   const matchesRecurrence = useCallback((date: Date, event: any, isRecurringClient: boolean) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -315,28 +320,27 @@ export function Demands() {
     });
     const topClient = Object.entries(clientCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Nenhum';
 
-    // Financial calculations
-    let totalInvestment = 0;
-    let totalLeads = 0;
-    let totalCPL = 0;
-    let clientsWithMetrics = 0;
+    // Financial calculations (Current Month)
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
 
-    clients.forEach(client => {
-      const clientEntries = entries[client.id] || [];
-      if (clientEntries.length > 0) {
-        const sorted = [...clientEntries].sort((a, b) => b.date.localeCompare(a.date));
-        const latest = sorted[0];
-        
-        totalInvestment += latest.investment || 0;
-        totalLeads += latest.leads || 0;
-
-        const metrics = calculateMetrics(latest, client.businessType);
-        if (metrics.cpl && metrics.cpl > 0) {
-          totalCPL += metrics.cpl;
-          clientsWithMetrics++;
-        }
-      }
+    const monthEntries = allEntries.filter(entry => {
+      const d = parseISO(entry.date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
+
+    let totalInvestment = 0;
+    let totalRevenue = 0;
+    let totalLeads = 0;
+
+    monthEntries.forEach(entry => {
+      totalInvestment += entry.investment || 0;
+      totalRevenue += entry.revenue || 0;
+      totalLeads += entry.leads || 0;
+    });
+
+    const averageCPL = totalLeads > 0 ? totalInvestment / totalLeads : 0;
+    const averageROAS = totalInvestment > 0 ? totalRevenue / totalInvestment : 0;
 
     return {
       today: todayDemands.length,
@@ -349,31 +353,38 @@ export function Demands() {
       topClient,
       overloadedDays,
       totalInvestment,
+      totalRevenue,
       totalLeads,
-      averageCPL: clientsWithMetrics > 0 ? totalCPL / clientsWithMetrics : 0
+      averageCPL,
+      averageROAS
     };
-  }, [allDemands, clients, entries]);
+  }, [allDemands, clients, allEntries]);
 
   const chartData = useMemo(() => {
-    const dates: Record<string, { investment: number, leads: number }> = {};
+    const dailyData: Record<string, { investment: number, leads: number, rawDate: string }> = {};
     
-    // Combine metrics from all clients day by day
-    Object.values(entries).forEach(clientEntries => {
-      clientEntries.forEach(entry => {
-        const dateLabel = format(parseISO(entry.date), 'dd/MM');
-        if (!dates[dateLabel]) {
-          dates[dateLabel] = { investment: 0, leads: 0 };
-        }
-        dates[dateLabel].investment += entry.investment || 0;
-        dates[dateLabel].leads += entry.leads || 0;
-      });
+    allEntries.forEach(entry => {
+      const dateKey = entry.date.split('T')[0];
+      if (!dailyData[dateKey]) {
+        dailyData[dateKey] = { 
+          investment: 0, 
+          leads: 0, 
+          rawDate: dateKey 
+        };
+      }
+      dailyData[dateKey].investment += entry.investment || 0;
+      dailyData[dateKey].leads += entry.leads || 0;
     });
 
-    return Object.entries(dates)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .slice(-15); // Show last 15 periods
-  }, [entries]);
+    return Object.values(dailyData)
+      .sort((a, b) => a.rawDate.localeCompare(b.rawDate))
+      .map(d => ({
+        name: format(parseISO(d.rawDate), 'dd/MM'),
+        investment: d.investment,
+        leads: d.leads
+      }))
+      .slice(-15);
+  }, [allEntries]);
 
   const handleUpdateStatus = async (demand: DemandItem, newStatus: DemandStatus) => {
     const toastId = toast.loading('Atualizando status...');
@@ -456,18 +467,26 @@ export function Demands() {
             >
               Dia
             </button>
+            <button 
+              onClick={() => setIsReportModalOpen(true)}
+              className="px-4 py-2 rounded-lg text-xs font-bold text-accent-mint hover:bg-accent-mint/10 transition-all flex items-center gap-2"
+            >
+              <FileText size={14} />
+              Relatório IA
+            </button>
           </div>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
         <SummaryCard label="Demandas Hoje" value={stats.today} icon={CalendarIcon} color="text-accent-mint" />
         <SummaryCard label="Atrasadas" value={stats.delayed} icon={AlertCircle} color="text-accent-coral" />
         <SummaryCard label="Concluídas" value={stats.completed} icon={CheckCircle2} color="text-accent-mint" />
-        <SummaryCard label="Investimento" value={formatCurrency(stats.totalInvestment)} icon={DollarSign} color="text-accent-mint" />
+        <SummaryCard label="Investimento" value={formatCurrency(stats.totalInvestment)} icon={DollarSign} color="text-accent-amber" />
+        <SummaryCard label="Faturamento" value={formatCurrency(stats.totalRevenue)} icon={TrendingUp} color="text-accent-mint" />
         <SummaryCard label="Total Leads" value={stats.totalLeads} icon={Zap} color="text-accent-amber" />
-        <SummaryCard label="CPL Médio" value={formatCurrency(stats.averageCPL)} icon={TrendingDown} color="text-accent-mint" />
+        <SummaryCard label="ROAS Médio" value={stats.averageROAS.toFixed(2) + 'x'} icon={BarChart2} color="text-accent-mint" />
         
         <div className="glass p-4 rounded-2xl flex flex-col gap-2 border border-white/5 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-16 h-16 bg-white/[0.02] -mr-8 -mt-8 rounded-full blur-xl group-hover:bg-white/[0.05] transition-all" />
@@ -475,8 +494,8 @@ export function Demands() {
              <LayoutDashboard size={16} className="text-text-muted" />
              <div className={cn("w-2 h-2 rounded-full", stats.overloadedDays > 0 ? "bg-accent-coral" : "bg-accent-mint")} />
           </div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Carga Equipe</p>
-          <p className="text-xl font-medium mt-0.5">{stats.overloadedDays > 0 ? 'CRÍTICA' : 'ESTÁVEL'}</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Equipe</p>
+          <p className="text-xl font-medium mt-0.5 truncate">{stats.overloadedDays > 0 ? 'CRÍTICA' : 'ESTÁVEL'}</p>
         </div>
       </div>
 
@@ -486,9 +505,18 @@ export function Demands() {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h3 className="text-lg font-medium">Performance Integrada</h3>
-              <p className="text-xs text-text-secondary">Visão geral de investimento vs leads de todos os clientes</p>
+              <p className="text-xs text-text-secondary">Soma de todos os lançamentos por período</p>
             </div>
-            <TrendingUp size={20} className="text-accent-mint" />
+            <div className="flex items-center gap-4">
+               <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-accent-mint" />
+                  <span className="text-[10px] text-text-secondary font-bold uppercase">Investimento</span>
+               </div>
+               <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-accent-amber" />
+                  <span className="text-[10px] text-text-secondary font-bold uppercase">Leads</span>
+               </div>
+            </div>
           </div>
           <div className="h-[240px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -525,15 +553,17 @@ export function Demands() {
 
         <div className="glass rounded-3xl p-6 border border-white/5 flex flex-col justify-center">
           <div className="space-y-6">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Métricas de Sucesso</h3>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Resumo Comercial</h3>
             <div className="space-y-4">
               <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold text-text-muted uppercase">Eficiência de Conversão</span>
-                  <span className="text-xs text-accent-mint font-medium">+12%</span>
+                  <span className="text-[10px] font-bold text-text-muted uppercase">ROI Geral Médio</span>
+                  <span className={cn("text-xs font-medium", stats.averageROAS >= 3 ? "text-accent-mint" : "text-accent-amber")}>
+                    {stats.averageROAS.toFixed(1)}x
+                  </span>
                 </div>
                 <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-                  <div className="bg-accent-mint h-full" style={{ width: '70%' }} />
+                  <div className={cn("h-full transition-all duration-1000", stats.averageROAS >= 3 ? "bg-accent-mint" : "bg-accent-amber")} style={{ width: `${Math.min((stats.averageROAS / 10) * 100, 100)}%` }} />
                 </div>
               </div>
               <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
@@ -542,7 +572,18 @@ export function Demands() {
                   <span className="text-xs text-accent-amber font-medium">{stats.totalLeads} / 5000</span>
                 </div>
                 <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-                  <div className="bg-accent-amber h-full" style={{ width: `${(stats.totalLeads / 5000) * 100}%` }} />
+                  <div className="bg-accent-amber h-full transition-all duration-1000" style={{ width: `${Math.min((stats.totalLeads / 5000) * 100, 100)}%` }} />
+                </div>
+              </div>
+              <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-text-muted uppercase">Saúde Financeira</span>
+                  <span className="text-xs text-accent-mint font-medium">ESTÁVEL</span>
+                </div>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div key={i} className={cn("flex-1 h-1 rounded-full", i <= 4 ? "bg-accent-mint" : "bg-white/10")} />
+                  ))}
                 </div>
               </div>
             </div>
@@ -750,6 +791,13 @@ export function Demands() {
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      <PerformanceReportModal 
+        isOpen={isReportModalOpen} 
+        onClose={() => setIsReportModalOpen(false)} 
+        clients={clients} 
+      />
     </div>
   );
 }

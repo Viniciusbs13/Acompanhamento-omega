@@ -122,13 +122,23 @@ export function Commercial() {
     return data;
   }, [monthlySales, monthKey, selectedMonth]);
 
-  const handleSaveGoal = async (target: number) => {
-    const newGoal: CommercialGoal = { ...monthlyGoal, target };
+  const [editGoalTarget, setEditGoalTarget] = useState(0);
+  const [editGoalNotes, setEditGoalNotes] = useState('');
+
+  const handleSaveGoal = async () => {
+    const newGoal: CommercialGoal = { ...monthlyGoal, target: editGoalTarget, notes: editGoalNotes };
     await storage.saveGoal(newGoal);
     setGoals(prev => prev.some(g => g.id === newGoal.id) ? prev.map(g => g.id === newGoal.id ? newGoal : g) : [...prev, newGoal]);
     setShowEditGoal(false);
     toast.success('Meta atualizada com sucesso');
   };
+
+  useEffect(() => {
+    if (showEditGoal) {
+      setEditGoalTarget(monthlyGoal.target);
+      setEditGoalNotes(monthlyGoal.notes || '');
+    }
+  }, [showEditGoal, monthlyGoal]);
 
   const handleAddSale = async (data: any) => {
     let clientId = data.clientId;
@@ -292,10 +302,28 @@ export function Commercial() {
                 className={cn("h-full transition-all duration-1000", getProgressColor(progress))}
               />
             </div>
-            <div className="flex justify-between text-[10px] font-bold uppercase tracking-tighter text-text-muted">
+            <div className="flex justify-between items-start text-[10px] font-bold uppercase tracking-tighter text-text-muted">
               <span>R$ 0</span>
               <span className="text-white">R$ {totalRevenue.toLocaleString()}</span>
-              <span>R$ {monthlyGoal.target.toLocaleString()}</span>
+              <div 
+                onClick={() => setShowEditGoal(true)}
+                className="flex flex-col items-end gap-1 cursor-pointer hover:text-accent-mint transition-colors group/goal"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="group-hover/goal:underline">R$ {monthlyGoal.target.toLocaleString()}</span>
+                  <Edit2 size={10} className="opacity-0 group-hover/goal:opacity-100 transition-opacity" />
+                </div>
+                {monthlyGoal.notes && (
+                  <span className="text-[8px] normal-case font-normal text-text-secondary max-w-[150px] text-right line-clamp-2">
+                    {monthlyGoal.notes}
+                  </span>
+                )}
+                {!monthlyGoal.notes && (
+                  <span className="text-[8px] normal-case font-normal text-white/20 opacity-0 group-hover/goal:opacity-100 transition-opacity italic">
+                    Adicionar nota...
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -468,13 +496,22 @@ export function Commercial() {
                    <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Valor da Meta (R$)</label>
                    <input 
                     type="number" 
-                    defaultValue={monthlyGoal.target} 
-                    onChange={(e) => monthlyGoal.target = Number(e.target.value)}
+                    value={editGoalTarget} 
+                    onChange={(e) => setEditGoalTarget(Number(e.target.value))}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium text-xl"
                    />
                 </div>
+                <div>
+                   <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Notas / Observações</label>
+                   <textarea 
+                    value={editGoalNotes} 
+                    onChange={(e) => setEditGoalNotes(e.target.value)}
+                    placeholder="Ex: Foco em lançamentos, reajuste de ticket..."
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium text-sm min-h-[100px] resize-none"
+                   />
+                </div>
                 <button 
-                  onClick={() => handleSaveGoal(monthlyGoal.target)}
+                  onClick={handleSaveGoal}
                   className="w-full py-4 bg-accent-mint text-black rounded-xl font-bold uppercase tracking-widest"
                 >
                   Salvar Meta

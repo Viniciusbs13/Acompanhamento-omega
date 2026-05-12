@@ -8,7 +8,8 @@ import {
   query, 
   where, 
   orderBy,
-  onSnapshot 
+  onSnapshot,
+  collectionGroup
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { Client, MetricEntry, UserSettings, Sale, CommercialGoal } from '../types';
@@ -29,6 +30,12 @@ interface FirestoreErrorInfo {
   authInfo: {
     userId?: string | null;
     email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
   }
 }
 
@@ -38,6 +45,12 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
     },
     operationType,
     path
@@ -178,6 +191,20 @@ export const firebaseStorage = {
       callback(clients);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, path);
+    });
+  },
+
+  listenToAllEntries: (callback: (entries: MetricEntry[]) => void) => {
+    if (!auth.currentUser) return () => {};
+    const q = query(
+      collectionGroup(db, 'entries'),
+      where('ownerId', '==', auth.currentUser.uid)
+    );
+    return onSnapshot(q, (snapshot) => {
+      const entries = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as MetricEntry));
+      callback(entries);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'collectionGroup:entries');
     });
   },
 

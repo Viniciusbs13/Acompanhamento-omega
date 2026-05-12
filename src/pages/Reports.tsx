@@ -11,12 +11,15 @@ import { storage } from '../lib/storage';
 import { formatCurrency, cn } from '../lib/utils';
 import { calculateMetrics } from '../lib/calculations';
 import { toast } from 'sonner';
+import { PerformanceReportModal } from '../components/PerformanceReportModal';
+import { Zap } from 'lucide-react';
 
 export function Reports() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [reportText, setReportText] = useState('');
   const [period, setPeriod] = useState('Atual');
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   
   const [clients, setClients] = useState<any[]>([]);
   const [entries, setEntries] = useState<any[]>([]);
@@ -108,6 +111,13 @@ export function Reports() {
           <h1 className="text-3xl font-medium tracking-tight">Relatórios de Performance</h1>
           <p className="text-text-muted">Gere documentos detalhados para seus clientes</p>
         </div>
+        <button 
+          onClick={() => setIsReportModalOpen(true)}
+          className="flex items-center gap-2 bg-white/5 border border-white/10 hover:border-accent-mint/50 px-6 py-3 rounded-2xl text-sm font-bold text-accent-mint transition-all shadow-lg"
+        >
+          <Zap size={18} fill="currentColor" />
+          GERADOR IA (PRINT)
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -287,6 +297,12 @@ export function Reports() {
           </AnimatePresence>
         </div>
       </div>
+
+      <PerformanceReportModal 
+        isOpen={isReportModalOpen} 
+        onClose={() => setIsReportModalOpen(false)} 
+        clients={clients} 
+      />
     </div>
   );
 }

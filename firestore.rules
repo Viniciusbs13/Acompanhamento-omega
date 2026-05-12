@@ -57,8 +57,8 @@ service cloud.firestore {
 
       // Metric Entries (Sub-collection)
       match /entries/{entryId} {
-        function isValidEntry(data) {
-          return data.clientId == clientId &&
+        function isValidEntry(data, cid) {
+          return data.clientId == cid &&
                  (data.investment is number || data.investment is int) &&
                  data.date is string &&
                  data.ownerId == request.auth.uid;
@@ -66,11 +66,16 @@ service cloud.firestore {
 
         allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
         allow get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
-        allow create: if isSignedIn() && isValidId(entryId) && isValidEntry(incoming());
-        allow update: if isSignedIn() && isOwner(existing()) && isValidEntry(incoming()) &&
+        allow create: if isSignedIn() && isValidId(entryId) && isValidEntry(incoming(), clientId);
+        allow update: if isSignedIn() && isOwner(existing()) && isValidEntry(incoming(), clientId) &&
                       incoming().ownerId == existing().ownerId;
         allow delete: if isSignedIn() && isOwner(existing());
       }
+    }
+
+    // Collection Group support for Metric Entries
+    match /{path=**}/entries/{entryId} {
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
 
     // Sales Registry
@@ -97,6 +102,7 @@ service cloud.firestore {
         return data.month is number &&
                data.year is number &&
                data.target is number &&
+               (data.get('notes', '') is string) &&
                data.ownerId == request.auth.uid;
       }
 
