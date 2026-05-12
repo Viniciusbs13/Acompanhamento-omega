@@ -23,11 +23,14 @@ import {
   MoreVertical,
   Edit2,
   Trash2,
-  ArrowRight
+  ArrowRight,
+  DollarSign,
+  Zap
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { storage } from '../lib/storage';
-import { Client } from '../types';
+import { Client, MetricEntry } from '../types';
+import { calculateMetrics } from '../lib/calculations';
 import { toast } from 'sonner';
 import { 
   format, 
@@ -49,9 +52,19 @@ import {
   endOfDay,
   addWeeks,
   subWeeks,
-  differenceInDays
+  differenceInDays,
+  parseISO
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from 'recharts';
 
 type ViewMode = 'day' | 'week' | 'month';
 type DemandStatus = 'PENDENTE' | 'EM_ANDAMENTO' | 'AGUARDANDO_APROVACAO' | 'CONCLUIDO' | 'ATRASADO';
@@ -75,6 +88,7 @@ interface DemandItem {
 
 export function Demands() {
   const [clients, setClients] = useState<Client[]>([]);
+  const [entries, setEntries] = useState<Record<string, MetricEntry[]>>({});
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -85,8 +99,17 @@ export function Demands() {
 
   useEffect(() => {
     setLoading(true);
-    const unsubscribe = storage.listenToClients((allClients) => {
+    const unsubscribe = storage.listenToClients(async (allClients) => {
       setClients(allClients);
+      
+      // Fetch entries for all clients to calculate financial metrics
+      const entriesMap: Record<string, MetricEntry[]> = {};
+      await Promise.all(allClients.map(async (client) => {
+        const clientEntries = await storage.getEntries(client.id);
+        entriesMap[client.id] = clientEntries;
+      }));
+      setEntries(entriesMap);
+      
       setLoading(false);
     });
     return () => unsubscribe();
@@ -177,7 +200,7 @@ export function Demands() {
             }
           });
         } else {
-          const itemDateStr = item.targetDate || item.date || '';
+          const itemDateStr = item.targetDate || '';
           if (!itemDateStr) return;
           const itemDate = startOfDay(new Date(itemDateStr + "T12:00:00"));
           
@@ -272,7 +295,7 @@ export function Demands() {
     });
   }, [allDemands, searchQuery, statusFilter, priorityFilter, responsibleFilter]);
 
-  const summary = useMemo(() => {
+  const stats = useMemo(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
     const todayDemands = allDemands.filter(d => d.date === today);
     const delayed = allDemands.filter(d => d.status === 'ATRASADO');
@@ -292,6 +315,29 @@ export function Demands() {
     });
     const topClient = Object.entries(clientCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Nenhum';
 
+    // Financial calculations
+    let totalInvestment = 0;
+    let totalLeads = 0;
+    let totalCPL = 0;
+    let clientsWithMetrics = 0;
+
+    clients.forEach(client => {
+      const clientEntries = entries[client.id] || [];
+      if (clientEntries.length > 0) {
+        const sorted = [...clientEntries].sort((a, b) => b.date.localeCompare(a.date));
+        const latest = sorted[0];
+        
+        totalInvestment += latest.investment || 0;
+        totalLeads += latest.leads || 0;
+
+        const metrics = calculateMetrics(latest, client.businessType);
+        if (metrics.cpl && metrics.cpl > 0) {
+          totalCPL += metrics.cpl;
+          clientsWithMetrics++;
+        }
+      }
+    });
+
     return {
       today: todayDemands.length,
       delayed: delayed.length,
@@ -301,9 +347,33 @@ export function Demands() {
         return date >= startOfWeek(new Date()) && date <= endOfWeek(new Date());
       }).length,
       topClient,
-      overloadedDays
+      overloadedDays,
+      totalInvestment,
+      totalLeads,
+      averageCPL: clientsWithMetrics > 0 ? totalCPL / clientsWithMetrics : 0
     };
-  }, [allDemands]);
+  }, [allDemands, clients, entries]);
+
+  const chartData = useMemo(() => {
+    const dates: Record<string, { investment: number, leads: number }> = {};
+    
+    // Combine metrics from all clients day by day
+    Object.values(entries).forEach(clientEntries => {
+      clientEntries.forEach(entry => {
+        const dateLabel = format(parseISO(entry.date), 'dd/MM');
+        if (!dates[dateLabel]) {
+          dates[dateLabel] = { investment: 0, leads: 0 };
+        }
+        dates[dateLabel].investment += entry.investment || 0;
+        dates[dateLabel].leads += entry.leads || 0;
+      });
+    });
+
+    return Object.entries(dates)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(-15); // Show last 15 periods
+  }, [entries]);
 
   const handleUpdateStatus = async (demand: DemandItem, newStatus: DemandStatus) => {
     const toastId = toast.loading('Atualizando status...');
@@ -361,10 +431,10 @@ export function Demands() {
           <p className="text-text-secondary">Central operacional de todos os clientes</p>
         </div>
         <div className="flex items-center gap-4">
-          {summary.overloadedDays > 0 && (
+          {stats.overloadedDays > 0 && (
             <div className="flex items-center gap-2 px-4 py-2 bg-accent-coral/10 border border-accent-coral/20 rounded-xl text-accent-coral animate-pulse">
               <AlertCircle size={14} />
-              <span className="text-[10px] font-bold uppercase">Sobrecarga Detectada: {summary.overloadedDays} dias</span>
+              <span className="text-[10px] font-bold uppercase">Sobrecarga Detectada: {stats.overloadedDays} dias</span>
             </div>
           )}
           <div className="flex bg-white/5 p-1 rounded-xl border border-white/5">
@@ -391,20 +461,92 @@ export function Demands() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-        <SummaryCard label="Demandas Hoje" value={summary.today} icon={CalendarIcon} color="text-accent-mint" />
-        <SummaryCard label="Atrasadas" value={summary.delayed} icon={AlertCircle} color="text-accent-coral" />
-        <SummaryCard label="Concluídas" value={summary.completed} icon={CheckCircle2} color="text-accent-mint" />
-        <SummaryCard label="Demandas Semana" value={summary.week} icon={Clock} color="text-fuchsia-400" />
-        <SummaryCard label="Maior Volume" value={summary.topClient} icon={Users} color="text-accent-amber" />
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
+        <SummaryCard label="Demandas Hoje" value={stats.today} icon={CalendarIcon} color="text-accent-mint" />
+        <SummaryCard label="Atrasadas" value={stats.delayed} icon={AlertCircle} color="text-accent-coral" />
+        <SummaryCard label="Concluídas" value={stats.completed} icon={CheckCircle2} color="text-accent-mint" />
+        <SummaryCard label="Investimento" value={formatCurrency(stats.totalInvestment)} icon={DollarSign} color="text-accent-mint" />
+        <SummaryCard label="Total Leads" value={stats.totalLeads} icon={Zap} color="text-accent-amber" />
+        <SummaryCard label="CPL Médio" value={formatCurrency(stats.averageCPL)} icon={TrendingDown} color="text-accent-mint" />
+        
         <div className="glass p-4 rounded-2xl flex flex-col gap-2 border border-white/5 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-16 h-16 bg-white/[0.02] -mr-8 -mt-8 rounded-full blur-xl group-hover:bg-white/[0.05] transition-all" />
           <div className="flex items-center justify-between">
              <LayoutDashboard size={16} className="text-text-muted" />
-             <div className={cn("w-2 h-2 rounded-full", summary.overloadedDays > 0 ? "bg-accent-coral" : "bg-accent-mint")} />
+             <div className={cn("w-2 h-2 rounded-full", stats.overloadedDays > 0 ? "bg-accent-coral" : "bg-accent-mint")} />
           </div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Carga Equipe</p>
-          <p className="text-xl font-medium mt-0.5">{summary.overloadedDays > 0 ? 'CRÍTICA' : 'ESTÁVEL'}</p>
+          <p className="text-xl font-medium mt-0.5">{stats.overloadedDays > 0 ? 'CRÍTICA' : 'ESTÁVEL'}</p>
+        </div>
+      </div>
+
+      {/* Metrics Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 glass rounded-3xl p-6 border border-white/5">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="text-lg font-medium">Performance Integrada</h3>
+              <p className="text-xs text-text-secondary">Visão geral de investimento vs leads de todos os clientes</p>
+            </div>
+            <TrendingUp size={20} className="text-accent-mint" />
+          </div>
+          <div className="h-[240px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#00D9A3" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#00D9A3" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fill: '#6B7280' }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fill: '#6B7280' }}
+                />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0A0A0B', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                  itemStyle={{ fontSize: '10px' }}
+                />
+                <Area type="monotone" dataKey="investment" stroke="#00D9A3" fillOpacity={1} fill="url(#colorValue)" />
+                <Area type="monotone" dataKey="leads" stroke="#FACC15" fillOpacity={0} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="glass rounded-3xl p-6 border border-white/5 flex flex-col justify-center">
+          <div className="space-y-6">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Métricas de Sucesso</h3>
+            <div className="space-y-4">
+              <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-text-muted uppercase">Eficiência de Conversão</span>
+                  <span className="text-xs text-accent-mint font-medium">+12%</span>
+                </div>
+                <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                  <div className="bg-accent-mint h-full" style={{ width: '70%' }} />
+                </div>
+              </div>
+              <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-text-muted uppercase">Meta de Leads Mensal</span>
+                  <span className="text-xs text-accent-amber font-medium">{stats.totalLeads} / 5000</span>
+                </div>
+                <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                  <div className="bg-accent-amber h-full" style={{ width: `${(stats.totalLeads / 5000) * 100}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
