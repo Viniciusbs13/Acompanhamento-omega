@@ -36,6 +36,13 @@ export function PerformanceReportModal({ isOpen, onClose, clients }: Performance
   const [generatedReport, setGeneratedReport] = useState<string>('');
   const [extractedData, setExtractedData] = useState<ExtractedReportData | null>(null);
   const [reportDate, setReportDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  
+  // Editable fields for saving
+  const [editInvestment, setEditInvestment] = useState(0);
+  const [editConversions, setEditConversions] = useState(0);
+  const [editDataInicial, setEditDataInicial] = useState('');
+  const [editDataFinal, setEditDataFinal] = useState('');
+
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -72,6 +79,11 @@ export function PerformanceReportModal({ isOpen, onClose, clients }: Performance
       }
 
       setExtractedData(data);
+      setEditInvestment(data.valorInvestido);
+      setEditConversions(data.conversoes);
+      setEditDataInicial(data.dataInicial || '');
+      setEditDataFinal(data.dataFinal || '');
+
       if (data.dataFinal) {
         // Try to set report date to final date of extraction if valid format
         try {
@@ -153,15 +165,15 @@ ANÁLISE DA PERFORMANCE
           id: `${selectedClient}-${new Date(reportDate).getTime()}`,
           clientId: selectedClient,
           date: reportDate,
-          endDate: extractedData.dataFinal ? (extractedData.dataFinal.includes('/') ? format(parseISO(extractedData.dataFinal.split('/').reverse().join('-')), 'yyyy-MM-dd') : extractedData.dataFinal) : reportDate,
-          investment: extractedData.valorInvestido,
+          endDate: editDataFinal ? (editDataFinal.includes('/') ? format(parseISO(editDataFinal.split('/').reverse().join('-')), 'yyyy-MM-dd') : editDataFinal) : reportDate,
+          investment: editInvestment,
           clicks: extractedData.cliques,
           alcance: extractedData.alcance,
-          conversions: extractedData.conversoes, // Not directly in interface but we can add or use specialized ones
+          conversions: editConversions,
           // Map based on type
-          ...(reportType === 'MENSAGENS' ? { waConversations: extractedData.conversoes } : {}),
-          ...(reportType === 'VENDAS' ? { purchases: extractedData.conversoes, sales: extractedData.conversoes } : {}),
-          ...(reportType === 'LEADS' ? { leads: extractedData.conversoes } : {}),
+          ...(reportType === 'MENSAGENS' ? { waConversations: editConversions } : {}),
+          ...(reportType === 'VENDAS' ? { purchases: editConversions, sales: editConversions } : {}),
+          ...(reportType === 'LEADS' ? { leads: editConversions } : {}),
         };
 
         await storage.saveEntry(newEntry);
@@ -171,7 +183,7 @@ ANÁLISE DA PERFORMANCE
           ...client,
           smartGoal: {
             ...client.smartGoal,
-            adSpend: extractedData.valorInvestido || client.smartGoal.adSpend
+            adSpend: editInvestment || client.smartGoal.adSpend
           }
         };
         await storage.saveClient(updatedClient);
@@ -372,22 +384,54 @@ ANÁLISE DA PERFORMANCE
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-black/20 p-3 rounded-xl border border-white/5">
-                          <p className="text-[8px] font-bold text-text-muted uppercase tracking-widest">Investimento</p>
-                          <p className="text-sm font-medium text-white">{formatCurrency(extractedData?.valorInvestido || 0)}</p>
+                        <div className="bg-black/20 p-3 rounded-xl border border-white/5 focus-within:border-accent-mint/30 transition-all">
+                          <p className="text-[8px] font-bold text-text-muted uppercase tracking-widest mb-1">Investimento (R$)</p>
+                          <input 
+                            type="number"
+                            value={editInvestment}
+                            onChange={(e) => setEditInvestment(Number(e.target.value))}
+                            className="w-full bg-transparent text-sm font-medium text-white outline-none"
+                          />
                         </div>
-                        <div className="bg-black/20 p-3 rounded-xl border border-white/5">
-                          <p className="text-[8px] font-bold text-text-muted uppercase tracking-widest">
-                            {reportType === 'VENDAS' ? 'Custo por Venda' : 'CPL'}
+                        <div className="bg-black/20 p-3 rounded-xl border border-white/5 focus-within:border-accent-mint/30 transition-all">
+                          <p className="text-[8px] font-bold text-text-muted uppercase tracking-widest mb-1">
+                            {reportType === 'MENSAGENS' ? 'Conversas' : 'Conversões'}
                           </p>
-                          <p className="text-sm font-medium text-white">{formatCurrency(extractedData?.custoPorConversao || 0)}</p>
+                          <input 
+                            type="number"
+                            value={editConversions}
+                            onChange={(e) => setEditConversions(Number(e.target.value))}
+                            className="w-full bg-transparent text-sm font-medium text-white outline-none"
+                          />
                         </div>
-                        <div className="bg-black/20 p-3 rounded-xl border border-white/5 col-span-2">
+                        
+                        <div className="bg-black/20 p-3 rounded-xl border border-white/5 col-span-2 space-y-2">
                           <p className="text-[8px] font-bold text-text-muted uppercase tracking-widest">Período Extraído</p>
-                          <p className="text-xs font-medium text-text-secondary truncate">
-                            {extractedData?.dataInicial || '???'} - {extractedData?.dataFinal || '???'}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="text"
+                              value={editDataInicial}
+                              onChange={(e) => setEditDataInicial(e.target.value)}
+                              placeholder="Início"
+                              className="flex-1 bg-black/20 border border-white/5 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none focus:border-accent-mint/30"
+                            />
+                            <span className="text-text-muted text-[10px]">até</span>
+                            <input 
+                              type="text"
+                              value={editDataFinal}
+                              onChange={(e) => setEditDataFinal(e.target.value)}
+                              placeholder="Fim"
+                              className="flex-1 bg-black/20 border border-white/5 rounded-lg px-2 py-1.5 text-[10px] text-white outline-none focus:border-accent-mint/30"
+                            />
+                          </div>
                         </div>
+
+                        {editInvestment > 0 && editConversions > 0 && (
+                          <div className="col-span-2 px-2 py-1 border-t border-white/5 flex justify-between items-center">
+                            <span className="text-[9px] text-text-muted uppercase font-bold">{reportType === 'VENDAS' ? 'Custo por Venda' : 'CPL Estimado'}</span>
+                            <span className="text-[10px] text-accent-mint font-bold">{formatCurrency(editInvestment / editConversions)}</span>
+                          </div>
+                        )}
                       </div>
 
                       <button 
