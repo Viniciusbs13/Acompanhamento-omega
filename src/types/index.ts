@@ -106,6 +106,8 @@ export interface MetricEntry {
   leads?: number;
   sales?: number;
   clicks?: number;
+  alcance?: number;
+  conversions?: number;
   cpm?: number;
   
   // Specific to SERVICE_BOOKING

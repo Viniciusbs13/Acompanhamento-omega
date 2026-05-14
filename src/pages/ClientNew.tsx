@@ -112,6 +112,8 @@ export function ClientNew() {
   });
 
   const watchBillingModel = useWatch({ control, name: 'billingModel' });
+  const watchCaptures = useWatch({ control, name: 'captures' });
+  const watchContentItems = useWatch({ control, name: 'contentItems' });
 
   const onFormError = (errors: any) => {
     console.error('Erros de validação:', errors);
@@ -638,7 +640,7 @@ export function ClientNew() {
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4">
-                  {(useWatch({ control, name: 'captures' }) || []).map((item: any, idx: number) => (
+                  {(watchCaptures || []).map((item: any, idx: number) => (
                     <div key={item.id} className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5 group">
                       <div className="w-8 h-8 rounded-full bg-fuchsia-400/10 text-fuchsia-400 flex items-center justify-center text-xs font-bold">
                         <Camera size={14} />
@@ -726,7 +728,7 @@ export function ClientNew() {
                 </div>
                 
                 <div className="grid grid-cols-1 gap-4">
-                  {(useWatch({ control, name: 'contentItems' }) || []).map((item: any, idx: number) => (
+                  {(watchContentItems || []).map((item: any, idx: number) => (
                     <div key={item.id} className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5 group">
                       <div className="w-8 h-8 rounded-full bg-accent-mint/10 text-accent-mint flex items-center justify-center text-xs font-bold">
                         {idx + 1}
