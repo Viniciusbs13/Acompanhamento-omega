@@ -14,10 +14,13 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
-  FileText
+  FileText,
+  Calendar,
+  CreditCard,
+  Check
 } from 'lucide-react';
 import { storage } from '../lib/storage';
-import { Client, ManagementFlag } from '../types';
+import { Client, ManagementFlag, MonthlyPayment } from '../types';
 import { formatCurrency, cn } from '../lib/utils';
 import { useVisibility } from '../contexts/VisibilityContext';
 import { toast } from 'sonner';
@@ -100,18 +103,54 @@ const isContentDelayed = (client: any) => {
 export function Management() {
   const { isVisible } = useVisibility();
   const [clients, setClients] = useState<Client[]>([]);
+  const [payments, setPayments] = useState<MonthlyPayment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [paymentLoading, setPaymentLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const currentMonthNum = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
   useEffect(() => {
-    fetchClients();
+    fetchData();
   }, []);
 
-  const fetchClients = async () => {
+  const fetchData = async () => {
     setLoading(true);
-    const data = await storage.getClients();
-    setClients(data);
+    const [clientsData, paymentsData] = await Promise.all([
+      storage.getClients(),
+      storage.getPayments(currentMonthNum, currentYear)
+    ]);
+    setClients(clientsData);
+    setPayments(paymentsData);
     setLoading(false);
+  };
+
+  const togglePayment = async (client: Client) => {
+    const existingPayment = payments.find(p => p.clientId === client.id);
+    const newStatus = existingPayment?.status === 'PAID' ? 'PENDING' : 'PAID';
+    
+    const payment: MonthlyPayment = {
+      id: `${currentYear}-${currentMonthNum}-${client.id}`,
+      clientId: client.id,
+      month: currentMonthNum,
+      year: currentYear,
+      status: newStatus,
+      value: client.planValue || 0,
+      paidAt: newStatus === 'PAID' ? new Date().toISOString() : undefined
+    };
+
+    try {
+      await storage.savePayment(payment);
+      setPayments(prev => {
+        const other = prev.filter(p => p.clientId !== client.id);
+        return [...other, payment];
+      });
+      toast.success(newStatus === 'PAID' ? `Pagamento de ${client.name} confirmado` : `Pagamento de ${client.name} marcado como pendente`);
+    } catch (error) {
+      toast.error('Erro ao salvar pagamento');
+    }
   };
 
   const categorizedClients = useMemo(() => {
@@ -204,6 +243,107 @@ export function Management() {
           icon={<CheckCircle2 size={20} className="text-white" />}
           color="white"
         />
+      </div>
+
+      {/* Financeiro / Pagamentos Section */}
+      <div className="space-y-6 pt-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-accent-mint/10 rounded-lg">
+              <Calendar className="text-accent-mint" size={18} />
+            </div>
+            <div>
+              <h2 className="text-lg font-medium tracking-tight">Fluxo de Caixa: {monthNames[currentMonthNum]}</h2>
+              <p className="text-[10px] text-text-muted font-medium uppercase tracking-widest">Confirmação de recebimento mensal</p>
+            </div>
+          </div>
+          <div className="hidden md:flex items-center gap-4">
+             <div className="flex items-center gap-2 px-3 py-1.5 bg-accent-mint/5 rounded-full border border-accent-mint/10">
+                <div className="w-1.5 h-1.5 rounded-full bg-accent-mint animate-pulse" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-accent-mint">Pago</span>
+             </div>
+             <div className="flex items-center gap-2 px-3 py-1.5 bg-accent-coral/5 rounded-full border border-accent-coral/10">
+                <div className="w-1.5 h-1.5 rounded-full bg-accent-coral" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-accent-coral">Pendente</span>
+             </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {categorizedClients.monthly.map((client) => {
+            const payment = payments.find(p => p.clientId === client.id);
+            const isPaid = payment?.status === 'PAID';
+            
+            return (
+              <motion.div 
+                key={client.id}
+                whileHover={{ y: -4 }}
+                onClick={() => togglePayment(client)}
+                className={cn(
+                  "glass p-4 rounded-2xl border transition-all cursor-pointer group relative overflow-hidden",
+                  isPaid ? "border-accent-mint/30 bg-accent-mint/[0.03]" : "border-white/5 hover:border-white/10"
+                )}
+              >
+                <div className="flex items-start justify-between gap-3 relative z-10">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-black shrink-0 shadow-lg transition-transform group-hover:scale-105" style={{ backgroundColor: client.brandColor }}>
+                        {client.logo ? <img src={client.logo} className="w-full h-full object-cover rounded-xl" alt="" /> : client.name.charAt(0)}
+                      </div>
+                      {isPaid && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-accent-mint rounded-full flex items-center justify-center text-black shadow-lg border-2 border-bg-base">
+                          <Check size={10} strokeWidth={4} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-bold text-xs text-white leading-tight truncate">{client.name}</span>
+                      <span className="text-[10px] text-text-secondary mt-0.5">
+                        {isVisible ? formatCurrency(client.planValue || 0) : '•••••'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {!isPaid && (
+                    <div className="w-6 h-6 rounded-lg bg-white/5 text-text-muted flex items-center justify-center group-hover:bg-accent-coral/20 group-hover:text-accent-coral transition-colors">
+                      <CreditCard size={14} />
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 flex items-center justify-between gap-2">
+                   {isPaid ? (
+                     <div className="flex flex-col">
+                        <span className="text-[10px] text-accent-mint font-bold uppercase tracking-tighter">Confirmado</span>
+                        <span className="text-[8px] text-text-muted mt-0.5">{payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('pt-BR') : ''}</span>
+                     </div>
+                   ) : (
+                     <div className="flex flex-col">
+                        <span className="text-[10px] text-accent-coral font-bold uppercase tracking-tighter">Não Recebido</span>
+                        <div className="flex items-center gap-1 mt-0.5">
+                           <div className="w-1 h-1 rounded-full bg-accent-coral animate-pulse" />
+                           <span className="text-[8px] text-text-muted italic">Aguardando...</span>
+                        </div>
+                     </div>
+                   )}
+                   
+                   <button className={cn(
+                     "px-2 py-1 rounded text-[8px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all",
+                     isPaid ? "hover:bg-accent-coral/20 hover:text-accent-coral text-text-muted" : "bg-accent-mint text-black"
+                   )}>
+                     {isPaid ? 'Estornar' : 'Confirmar'}
+                   </button>
+                </div>
+                
+                {/* Visual indicator corner */}
+                <div className={cn(
+                  "absolute top-0 right-0 w-8 h-8 -mr-4 -mt-4 rotate-45 transition-colors",
+                  isPaid ? "bg-accent-mint/20" : "bg-transparent"
+                )} />
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="space-y-12">

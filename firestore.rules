@@ -42,9 +42,10 @@ service cloud.firestore {
     match /clients/{clientId} {
       function isValidClient(data) {
         return data.name is string && data.name.size() <= 150 &&
-               data.businessType in ['SERVICE_BOOKING', 'ECOMMERCE', 'B2B_LEADS', 'WHATSAPP', 'INFO_PRODUCTS', 'REAL_ESTATE', 'LOCAL_BUSINESS', 'VIDEO_PRODUCTION', 'CONTENT_EDITING'] &&
+               data.businessType in ['SERVICE_BOOKING', 'ECOMMERCE', 'B2B_LEADS', 'WHATSAPP', 'INFO_PRODUCTS', 'REAL_ESTATE', 'LOCAL_BUSINESS', 'VIDEO_PRODUCTION', 'CONTENT_EDITING', 'LAUNCH'] &&
                data.ownerId == request.auth.uid &&
                data.brandColor is string &&
+               data.get('accessInfo', []) is list &&
                data.smartGoal is map;
       }
 
@@ -110,6 +111,25 @@ service cloud.firestore {
       allow get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
       allow create: if isSignedIn() && isValidId(goalId) && isValidGoal(incoming());
       allow update: if isSignedIn() && isOwner(existing()) && isValidGoal(incoming()) &&
+                    incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() && isOwner(existing());
+    }
+
+    // Monthly Payments
+    match /payments/{paymentId} {
+      function isValidPayment(data) {
+        return data.clientId is string &&
+               data.month is number &&
+               data.year is number &&
+               data.status in ['PAID', 'PENDING'] &&
+               data.value is number &&
+               data.ownerId == request.auth.uid;
+      }
+
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(paymentId) && isValidPayment(incoming());
+      allow update: if isSignedIn() && isOwner(existing()) && isValidPayment(incoming()) &&
                     incoming().ownerId == existing().ownerId;
       allow delete: if isSignedIn() && isOwner(existing());
     }

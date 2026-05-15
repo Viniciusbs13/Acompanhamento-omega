@@ -6,7 +6,7 @@ import jsPDF from 'jspdf';
 import { 
   TrendingUp, TrendingDown, Clock, Plus, FileText, 
   BarChart3, Settings, Share2, Maximize2, Download,
-  ArrowRight, Users, CreditCard, DollarSign, Target, PlusCircle, Trash2, Edit2, ChevronDown, CheckCircle2, AlertCircle, Info, Minimize2, ExternalLink, Camera, CalendarDays, Play, X, MessageSquare
+  ArrowRight, Users, CreditCard, DollarSign, Target, PlusCircle, Trash2, Edit2, ChevronDown, CheckCircle2, AlertCircle, Info, Minimize2, ExternalLink, Camera, CalendarDays, Play, X, MessageSquare, Key, Lock, Copy, Eye, EyeOff
 } from 'lucide-react';
 import { useEntries } from '../hooks/useMetrics';
 import { storage } from '../lib/storage';
@@ -1296,6 +1296,7 @@ export function ClientDashboard() {
                   managementStatus: formData.get('managementStatus') as string,
                   billingModel: formData.get('billingModel') as string,
                   isRange: formData.get('isRange') === 'on',
+                  accessInfo: client.accessInfo || []
                 };
                 await storage.saveClient(updatedClient);
                 toast.success("Configurações atualizadas!");
@@ -1357,6 +1358,51 @@ export function ClientDashboard() {
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Link do Contrato</label>
                     <input name="contractUrl" defaultValue={client.contractUrl} placeholder="https://..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
+                  </div>
+                </div>
+
+                {/* Access Info Section */}
+                <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Lock size={16} className="text-accent-mint" />
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Acessos e Logins (Instagram, FB, Email...)</h4>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const current = client.accessInfo || [];
+                        const updatedClient = {
+                          ...client,
+                          accessInfo: [...current, { id: Math.random().toString(36).substring(7), platform: '', login: '', password: '' }]
+                        };
+                        setClient(updatedClient);
+                      }}
+                      className="text-[10px] font-bold text-accent-mint uppercase hover:underline"
+                    >
+                      + Adicionar Novo Acesso
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-3">
+                    {(client.accessInfo || []).map((item, idx) => (
+                      <AccessInfoRow 
+                        key={item.id} 
+                        item={item} 
+                        onChange={(updatedItem) => {
+                          const newInfo = [...client.accessInfo];
+                          newInfo[idx] = updatedItem;
+                          setClient({ ...client, accessInfo: newInfo });
+                        }}
+                        onRemove={() => {
+                          const newInfo = client.accessInfo.filter((_, i) => i !== idx);
+                          setClient({ ...client, accessInfo: newInfo });
+                        }}
+                      />
+                    ))}
+                    {(client.accessInfo || []).length === 0 && (
+                      <p className="text-[10px] text-text-muted italic text-center py-4">Nenhum acesso cadastrado.</p>
+                    )}
                   </div>
                 </div>
 
@@ -2540,6 +2586,112 @@ function HealthBadge({ status }: { status: string }) {
     <div className="flex items-center gap-2 px-2.5 py-1 rounded-full glass border-white/5">
        <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", configs.color, configs.glow)} />
        <span className="text-[10px] font-bold uppercase tracking-widest leading-none mt-0.5">{configs.text}</span>
+    </div>
+  );
+}
+
+function AccessInfoRow({ item, onChange, onRemove }: { item: any, onChange: (item: any) => void, onRemove: () => void }) {
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleCopy = (text: string, label: string) => {
+    if (!text) {
+      toast.error(`${label} está vazio!`);
+      return;
+    }
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado!`);
+  };
+
+  return (
+    <div className="flex flex-col gap-3 p-4 bg-white/5 rounded-xl border border-white/5 relative group/row">
+      <button 
+        type="button" 
+        onClick={onRemove}
+        className="absolute top-2 right-2 p-1.5 text-text-muted hover:text-accent-coral opacity-0 group-hover/row:opacity-100 transition-all"
+      >
+        <Trash2 size={14} />
+      </button>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="space-y-1">
+          <label className="text-[8px] font-bold text-text-muted uppercase tracking-wider">Plataforma</label>
+          <input 
+            value={item.platform} 
+            onChange={(e) => onChange({ ...item, platform: e.target.value })}
+            placeholder="Instagram, Facebook..."
+            className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-accent-mint/30"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[8px] font-bold text-text-muted uppercase tracking-wider">Usuário / Login</label>
+          <div className="flex items-center gap-2">
+            <input 
+              value={item.login} 
+              onChange={(e) => onChange({ ...item, login: e.target.value })}
+              placeholder="Ex: @empresa"
+              className="flex-1 bg-black/20 border border-white/10 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-accent-mint/30"
+            />
+            <button 
+              type="button"
+              onClick={() => handleCopy(item.login, 'Usuário')}
+              className="p-1.5 hover:bg-white/10 rounded-lg text-text-muted transition-colors"
+              title="Copiar Usuário"
+            >
+              <Copy size={14} />
+            </button>
+          </div>
+        </div>
+        <div className="space-y-1">
+          <label className="text-[8px] font-bold text-text-muted uppercase tracking-wider">Senha</label>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <input 
+                type={showPassword ? "text" : "password"}
+                value={item.password} 
+                onChange={(e) => onChange({ ...item, password: e.target.value })}
+                placeholder="********"
+                className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-accent-mint/30"
+              />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-white"
+              >
+                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+            <button 
+              type="button"
+              onClick={() => handleCopy(item.password, 'Senha')}
+              className="p-1.5 hover:bg-white/10 rounded-lg text-text-muted transition-colors"
+              title="Copiar Senha"
+            >
+              <Copy size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-[8px] font-bold text-text-muted uppercase tracking-wider">Link (URL)</label>
+          <input 
+            value={item.url || ''} 
+            onChange={(e) => onChange({ ...item, url: e.target.value })}
+            placeholder="Ex: https://instagram.com/..."
+            className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-accent-mint/30"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[8px] font-bold text-text-muted uppercase tracking-wider">Observações</label>
+          <input 
+            value={item.notes || ''} 
+            onChange={(e) => onChange({ ...item, notes: e.target.value })}
+            placeholder="Ex: 2FA ativa no celular..."
+            className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-accent-mint/30"
+          />
+        </div>
+      </div>
     </div>
   );
 }

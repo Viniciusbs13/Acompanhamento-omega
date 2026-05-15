@@ -12,7 +12,7 @@ import {
   collectionGroup
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import { Client, MetricEntry, UserSettings, Sale, CommercialGoal } from '../types';
+import { Client, MetricEntry, UserSettings, Sale, CommercialGoal, MonthlyPayment } from '../types';
 
 enum OperationType {
   CREATE = 'create',
@@ -77,8 +77,41 @@ const CLIENTS_COL = 'clients';
 const USERS_COL = 'users';
 const SALES_COL = 'sales';
 const GOALS_COL = 'goals';
+const PAYMENTS_COL = 'payments';
 
 export const firebaseStorage = {
+  // Payments
+  getPayments: async (month: number, year: number): Promise<MonthlyPayment[]> => {
+    if (!auth.currentUser) return [];
+    const path = PAYMENTS_COL;
+    try {
+      const q = query(
+        collection(db, path), 
+        where('ownerId', '==', auth.currentUser.uid),
+        where('month', '==', month),
+        where('year', '==', year)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as MonthlyPayment));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  savePayment: async (payment: MonthlyPayment) => {
+    if (!auth.currentUser) return;
+    const path = `${PAYMENTS_COL}/${payment.id}`;
+    try {
+      await setDoc(doc(db, PAYMENTS_COL, payment.id), cleanData({
+        ...payment,
+        ownerId: auth.currentUser.uid
+      }), { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
   // Sales
   getSales: async (monthYear?: string): Promise<Sale[]> => {
     if (!auth.currentUser) return [];

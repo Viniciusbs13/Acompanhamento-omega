@@ -28,6 +28,15 @@ export interface FunnelStep {
   label: string;
 }
 
+export interface AccessCredential {
+  id: string;
+  platform: string;
+  login: string;
+  password?: string;
+  url?: string;
+  notes?: string;
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -39,6 +48,7 @@ export interface Client {
   channels: string[];
   createdAt: string;
   customFunnelSteps?: FunnelStep[];
+  accessInfo?: AccessCredential[];
   // Management fields
   ownerNames?: string;
   planValue?: number;
@@ -196,4 +206,15 @@ export interface CommercialMetrics {
   salesCount: number;
   averageTicket: number;
   monthYear: string; // "MM/YYYY"
+}
+
+export interface MonthlyPayment {
+  id: string; // "YYYY-MM-clientId"
+  clientId: string;
+  month: number;
+  year: number;
+  status: 'PAID' | 'PENDING';
+  value: number;
+  paidAt?: string;
+  ownerId?: string;
 }

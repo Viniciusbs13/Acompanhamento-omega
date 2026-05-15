@@ -1,7 +1,16 @@
 import { firebaseStorage } from './firebaseStorage';
-import { Client, MetricEntry, UserSettings, Sale, CommercialGoal } from '../types';
+import { Client, MetricEntry, UserSettings, Sale, CommercialGoal, MonthlyPayment } from '../types';
 
 export const storage = {
+  // Payments
+  getPayments: async (month: number, year: number): Promise<MonthlyPayment[]> => {
+    return await firebaseStorage.getPayments(month, year);
+  },
+
+  savePayment: async (payment: MonthlyPayment) => {
+    await firebaseStorage.savePayment(payment);
+  },
+
   getClients: async (): Promise<Client[]> => {
     return await firebaseStorage.getClients();
   },

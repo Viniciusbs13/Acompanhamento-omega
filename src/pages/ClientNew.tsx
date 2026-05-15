@@ -65,6 +65,14 @@ const schema = z.object({
     isRecurring: z.boolean().default(false),
   })).default([]),
   billingModel: z.enum(['RECURRING', 'ONE_OFF']).default('RECURRING'),
+  accessInfo: z.array(z.object({
+    id: z.string(),
+    platform: z.string().min(1, "Plataforma é obrigatória"),
+    login: z.string().min(1, "Login é obrigatório"),
+    password: z.string().optional(),
+    url: z.string().optional(),
+    notes: z.string().optional(),
+  })).default([]),
 });
 
 export function ClientNew() {
@@ -114,6 +122,7 @@ export function ClientNew() {
   const watchBillingModel = useWatch({ control, name: 'billingModel' });
   const watchCaptures = useWatch({ control, name: 'captures' });
   const watchContentItems = useWatch({ control, name: 'contentItems' });
+  const watchAccessInfo = useWatch({ control, name: 'accessInfo' });
 
   const onFormError = (errors: any) => {
     console.error('Erros de validação:', errors);
@@ -165,6 +174,7 @@ export function ClientNew() {
         meetings: data.meetings || [],
         managementStatus: 'GREEN',
         billingModel: data.billingModel,
+        accessInfo: data.accessInfo || [],
       };
 
       console.log('Tentando salvar cliente:', newClient);
@@ -284,11 +294,11 @@ export function ClientNew() {
           <p className="text-text-secondary text-sm">Configure o perfil e metas estratégicas.</p>
         </div>
         <div className="flex items-center gap-1">
-          {[1, 2, 3, 4, 5, 6].map(i => (
+          {[1, 2, 3, 4, 5, 6, 7].map(i => (
             <div 
               key={i} 
               className={cn(
-                "h-1.5 w-12 rounded-full transition-all duration-500",
+                "h-1.5 w-10 rounded-full transition-all duration-500",
                 step >= i ? "bg-accent-mint" : "bg-white/10"
               )}
             />
@@ -769,6 +779,111 @@ export function ClientNew() {
               </div>
             </motion.div>
           )}
+
+          {step === 7 && (
+            <motion.div
+              key="step7"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-medium">Acessos e Logins</h2>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    const current = getValues('accessInfo') || [];
+                    setValue('accessInfo', [
+                      ...current, 
+                      { id: Math.random().toString(36).substring(7), platform: '', login: '' }
+                    ]);
+                  }}
+                  className="flex items-center gap-2 text-accent-mint text-sm font-bold hover:underline"
+                >
+                  <Plus size={16} /> Adicionar Acesso
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {(watchAccessInfo || []).map((item: any, idx: number) => (
+                  <div key={item.id} className="glass p-6 rounded-2xl border border-white/5 space-y-4 group relative">
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const current = getValues('accessInfo').filter((_: any, i: number) => i !== idx);
+                        setValue('accessInfo', [...current]);
+                      }}
+                      className="absolute top-4 right-4 p-2 text-text-muted hover:text-accent-coral opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5 ml-1">Plataforma</label>
+                        <input 
+                          placeholder="Ex: Instagram, FB Ads..."
+                          {...register(`accessInfo.${idx}.platform`)}
+                          className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-accent-mint/50 outline-none transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5 ml-1">Usuário/Email</label>
+                        <input 
+                          placeholder="usuario@email.com"
+                          {...register(`accessInfo.${idx}.login`)}
+                          className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-accent-mint/50 outline-none transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5 ml-1">Senha</label>
+                        <input 
+                          type="text"
+                          placeholder="********"
+                          {...register(`accessInfo.${idx}.password`)}
+                          className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-accent-mint/50 outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5 ml-1">Link/URL (Opcional)</label>
+                        <input 
+                          placeholder="https://facebook.com/..."
+                          {...register(`accessInfo.${idx}.url`)}
+                          className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-accent-mint/50 outline-none transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-text-muted uppercase mb-1.5 ml-1">Observações</label>
+                        <input 
+                          placeholder="Ex: Verificação em duas etapas no celular..."
+                          {...register(`accessInfo.${idx}.notes`)}
+                          className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:border-accent-mint/50 outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {(watchAccessInfo || []).length === 0 && (
+                  <div className="py-12 text-center glass rounded-2xl border-dashed">
+                    <p className="text-text-secondary">Nenhum acesso cadastrado ainda.</p>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setValue('accessInfo', [{ id: Math.random().toString(36).substring(7), platform: 'Instagram', login: '' }]);
+                      }}
+                      className="mt-4 text-xs font-bold text-accent-mint uppercase hover:underline"
+                    >
+                      Cadastrar Primeiro Acesso
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
 
         {/* Footer controls */}
@@ -789,7 +904,7 @@ export function ClientNew() {
             Voltar
           </button>
           
-          {step < 6 ? (
+          {step < 7 ? (
             <button
               type="button"
               onClick={() => {
