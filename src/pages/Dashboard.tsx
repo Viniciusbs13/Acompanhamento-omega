@@ -417,28 +417,10 @@ function GlobalClientCard({ client, index, entries }: any) {
                <div className="bg-white/5 p-3 rounded-2xl">
                   <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1">FATURAMENTO</p>
                   <p className="text-lg font-medium tracking-tight text-white/90">{last ? (isVisible ? formatCurrency(last.revenue || 0).replace('R$', '').trim() : '•••••') : '--'}</p>
-               </div>
-             </>
-           )}
+                </div>
+              </>
+            )}
         </div>
-
-        {client.contentPlan && (
-          <div className={cn(
-            "p-3 rounded-2xl flex items-center justify-between border transition-colors mb-4",
-            isContentDelayed(client) ? "bg-accent-coral/10 border-accent-coral/20" : "bg-white/5 border-white/5"
-          )}>
-            <div className="flex items-center gap-2">
-              <Activity size={14} className={isContentDelayed(client) ? "text-accent-coral" : "text-accent-mint"} />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Vídeos Postados</span>
-            </div>
-            <div className="text-xs font-bold">
-              <span className={cn(isContentDelayed(client) ? "text-accent-coral" : "text-white")}>
-                {client.contentPlan.items?.filter((i: any) => i.status === 'POSTED').length || 0}
-              </span>
-              <span className="text-text-muted"> / {client.contentPlan.total}</span>
-            </div>
-          </div>
-        )}
 
         <div className="mt-2 pt-4 border-t border-white/5 flex items-center justify-between">
            <div className="flex items-center gap-1.5">

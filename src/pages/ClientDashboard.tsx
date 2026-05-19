@@ -1273,7 +1273,6 @@ export function ClientDashboard() {
           >
             <div className="glass rounded-3xl p-8 border border-white/5 max-w-2xl mx-auto">
               <h3 className="text-xl font-medium mb-8">Configurações do Cliente</h3>
-              
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
@@ -1286,16 +1285,11 @@ export function ClientDashboard() {
                   contactInfo: formData.get('contactInfo') as string,
                   planValue: parseFloat(formData.get('planValue') as string) || 0,
                   planScope: formData.get('planScope') as string,
-                  contractUrl: formData.get('contractUrl') as string,
-                  strategyUrl: formData.get('strategyUrl') as string,
-                  contentPlan: {
-                    total: parseInt(formData.get('contentTotal') as string) || 0,
-                    items: client.contentPlan?.items || []
-                  },
-                  captures: client.captures || [],
                   managementStatus: formData.get('managementStatus') as string,
                   billingModel: formData.get('billingModel') as string,
                   isRange: formData.get('isRange') === 'on',
+                  contentPlan: client.contentPlan || { total: 0, items: [] },
+                  captures: client.captures || [],
                   accessInfo: client.accessInfo || []
                 };
                 await storage.saveClient(updatedClient);
@@ -1344,67 +1338,6 @@ export function ClientDashboard() {
                     <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Valor do Plano (Mensal)</label>
                     <input type="number" name="planValue" defaultValue={client.planValue} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
                  </div>
-
-                <div>
-                   <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Escopo do Plano</label>
-                   <textarea name="planScope" defaultValue={client.planScope} rows={3} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium resize-none" />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Link da Estratégia</label>
-                    <input name="strategyUrl" defaultValue={client.strategyUrl} placeholder="https://..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Link do Contrato</label>
-                    <input name="contractUrl" defaultValue={client.contractUrl} placeholder="https://..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent-mint/50 transition-all font-medium" />
-                  </div>
-                </div>
-
-                {/* Access Info Section */}
-                <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Lock size={16} className="text-accent-mint" />
-                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Acessos e Logins (Instagram, FB, Email...)</h4>
-                    </div>
-                    <button 
-                      type="button" 
-                      onClick={() => {
-                        const current = client.accessInfo || [];
-                        const updatedClient = {
-                          ...client,
-                          accessInfo: [...current, { id: Math.random().toString(36).substring(7), platform: '', login: '', password: '' }]
-                        };
-                        setClient(updatedClient);
-                      }}
-                      className="text-[10px] font-bold text-accent-mint uppercase hover:underline"
-                    >
-                      + Adicionar Novo Acesso
-                    </button>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 gap-3">
-                    {(client.accessInfo || []).map((item, idx) => (
-                      <AccessInfoRow 
-                        key={item.id} 
-                        item={item} 
-                        onChange={(updatedItem) => {
-                          const newInfo = [...client.accessInfo];
-                          newInfo[idx] = updatedItem;
-                          setClient({ ...client, accessInfo: newInfo });
-                        }}
-                        onRemove={() => {
-                          const newInfo = client.accessInfo.filter((_, i) => i !== idx);
-                          setClient({ ...client, accessInfo: newInfo });
-                        }}
-                      />
-                    ))}
-                    {(client.accessInfo || []).length === 0 && (
-                      <p className="text-[10px] text-text-muted italic text-center py-4">Nenhum acesso cadastrado.</p>
-                    )}
-                  </div>
-                </div>
 
                  <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-6">
                    <div className="flex items-center justify-between">
@@ -1480,9 +1413,9 @@ export function ClientDashboard() {
                            <select 
                              value={item.status}
                              onChange={(e) => {
-                                const newCaps = [...client.captures];
-                                newCaps[idx] = { ...newCaps[idx], status: e.target.value as any };
-                                setClient({ ...client, captures: newCaps });
+                                 const newCaps = [...client.captures];
+                                 newCaps[idx] = { ...newCaps[idx], status: e.target.value as any };
+                                 setClient({ ...client, captures: newCaps });
                              }}
                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-[10px] font-bold outline-none uppercase"
                            >
@@ -1502,7 +1435,7 @@ export function ClientDashboard() {
                         </div>
                       ))}
                    </div>
-                </div>
+                 </div>
 
                 <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-6">
                    <div className="flex items-center justify-between">
@@ -1550,9 +1483,9 @@ export function ClientDashboard() {
                            <select 
                              value={item.status}
                              onChange={(e) => {
-                                const newItems = [...client.contentPlan.items];
-                                newItems[idx] = { ...newItems[idx], status: e.target.value };
-                                setClient({ ...client, contentPlan: { ...client.contentPlan, items: newItems } });
+                                 const newItems = [...client.contentPlan.items];
+                                 newItems[idx] = { ...newItems[idx], status: e.target.value };
+                                 setClient({ ...client, contentPlan: { ...client.contentPlan, items: newItems } });
                              }}
                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-[10px] font-bold outline-none uppercase"
                            >
@@ -1572,6 +1505,95 @@ export function ClientDashboard() {
                         </div>
                       ))}
                    </div>
+                </div>
+
+                <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Informações de Acesso</h4>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                         const currentAccess = client.accessInfo || [];
+                         const updatedClient = {
+                           ...client,
+                           accessInfo: [...currentAccess, { id: Math.random().toString(36).substring(7), platform: 'Instagram', email: '', password: '', extra: '' }]
+                         };
+                         setClient(updatedClient);
+                      }}
+                      className="text-[10px] font-bold text-accent-mint uppercase hover:underline"
+                    >
+                      + Adicionar Acesso
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                     {(client.accessInfo || []).map((item: any, idx: number) => (
+                       <div key={item.id} className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-black/20 p-4 rounded-xl border border-white/5">
+                          <div>
+                             <label className="block text-[8px] font-bold text-text-muted uppercase mb-1">Plataforma</label>
+                             <input 
+                               value={item.platform}
+                               onChange={(e) => {
+                                 const newAccess = [...client.accessInfo];
+                                 newAccess[idx] = { ...newAccess[idx], platform: e.target.value };
+                                 setClient({ ...client, accessInfo: newAccess });
+                               }}
+                               placeholder="Ex: Instagram"
+                               className="bg-transparent text-xs font-medium text-white outline-none w-full"
+                             />
+                          </div>
+                          <div>
+                             <label className="block text-[8px] font-bold text-text-muted uppercase mb-1">Email / User</label>
+                             <input 
+                               value={item.email}
+                               onChange={(e) => {
+                                 const newAccess = [...client.accessInfo];
+                                 newAccess[idx] = { ...newAccess[idx], email: e.target.value };
+                                 setClient({ ...client, accessInfo: newAccess });
+                               }}
+                               className="bg-transparent text-xs font-medium text-white outline-none w-full"
+                             />
+                          </div>
+                          <div className="relative">
+                             <label className="block text-[8px] font-bold text-text-muted uppercase mb-1">Senha</label>
+                             <input 
+                               type="text"
+                               value={item.password}
+                               onChange={(e) => {
+                                 const newAccess = [...client.accessInfo];
+                                 newAccess[idx] = { ...newAccess[idx], password: e.target.value };
+                                 setClient({ ...client, accessInfo: newAccess });
+                               }}
+                               className="bg-transparent text-xs font-medium text-white outline-none w-full pr-8"
+                             />
+                          </div>
+                          <div className="flex items-center gap-2">
+                             <div className="flex-1">
+                                <label className="block text-[8px] font-bold text-text-muted uppercase mb-1">Outros</label>
+                                <input 
+                                  value={item.extra}
+                                  onChange={(e) => {
+                                    const newAccess = [...client.accessInfo];
+                                    newAccess[idx] = { ...newAccess[idx], extra: e.target.value };
+                                    setClient({ ...client, accessInfo: newAccess });
+                                  }}
+                                  className="bg-transparent text-xs font-medium text-white outline-none w-full"
+                                />
+                             </div>
+                             <button 
+                               type="button"
+                               onClick={() => {
+                                  const newAccess = client.accessInfo.filter((_: any, i: number) => i !== idx);
+                                  setClient({ ...client, accessInfo: newAccess });
+                               }}
+                               className="p-1.5 text-text-muted hover:text-accent-coral transition-colors"
+                             >
+                                <Trash2 size={14} />
+                             </button>
+                          </div>
+                       </div>
+                     ))}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
@@ -1763,9 +1785,8 @@ export function ClientDashboard() {
                   <button 
                     type="button"
                     onClick={async () => {
-                      if (window.confirm("Deseja realmente excluir este cliente e todos os dados vinculados?")) {
+                      if (window.confirm("Deseja realmente excluir este cliente?")) {
                         await storage.deleteClient(client.id);
-                        toast.success("Cliente removido!");
                         navigate('/clientes');
                       }
                     }}
@@ -1774,9 +1795,9 @@ export function ClientDashboard() {
                     <Trash2 size={14} /> Excluir Cliente
                   </button>
                   <button type="submit" className="bg-accent-mint text-black font-bold px-8 py-3 rounded-xl hover:bg-accent-mint/90 transition-all">Salvar Alterações</button>
-                </div>
-              </form>
-            </div>
+              </div>
+            </form>
+          </div>
 
             <div className="glass rounded-3xl p-8 border border-white/5 max-w-2xl mx-auto border-accent-coral/20">
                <h3 className="text-lg font-medium text-accent-coral mb-2">Zona de Perigo</h3>

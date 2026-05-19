@@ -17,13 +17,109 @@ import {
   FileText,
   Calendar,
   CreditCard,
-  Check
+  Check,
+  Play,
+  Camera
 } from 'lucide-react';
 import { storage } from '../lib/storage';
 import { Client, ManagementFlag, MonthlyPayment } from '../types';
 import { formatCurrency, cn } from '../lib/utils';
 import { useVisibility } from '../contexts/VisibilityContext';
 import { toast } from 'sonner';
+
+const getClientMonthStats = (client: any) => {
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentYear = today.getFullYear();
+  
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const isRecurringClient = client.billingModel === 'RECURRING';
+
+  const stats = {
+    contentTotal: 0,
+    contentDone: 0,
+    capturesTotal: 0,
+    capturesDone: 0
+  };
+
+  const isInMonth = (dateStr: string) => {
+    const d = new Date(dateStr + "T12:00:00");
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  };
+
+  const checkDateOccurs = (date: Date, evt: any) => {
+    const dateStr = date.toISOString().split('T')[0];
+    if (evt.deletedDates?.includes(dateStr)) return false;
+    const rType = evt.recurrenceType || (evt.isRecurring ? 'MONTHLY_DAY' : (evt.recurringDays && evt.recurringDays.length > 0) ? 'WEEKLY' : 'NONE');
+    const effectiveR = (evt.type === 'content' && isRecurringClient && rType === 'NONE' && evt.isRecurring === undefined) ? 'MONTHLY_DAY' : rType;
+    
+    switch (effectiveR) {
+      case 'DAILY': return true;
+      case 'WEEKLY': return evt.recurringDays?.includes(date.getDay());
+      case 'MONTHLY_DAY': return date.getDate() === new Date((evt.targetDate || evt.date) + "T12:00:00").getDate();
+      case 'MONTHLY_ORDINAL': {
+        if (!evt.ordinalWeekday) return false;
+        const { ordinal, day } = evt.ordinalWeekday;
+        if (date.getDay() !== day) return false;
+        return Math.ceil(date.getDate() / 7) === ordinal;
+      }
+      default: return false;
+    }
+  };
+
+  client.contentPlan?.items?.forEach((item: any) => {
+    const isRecurring = item.recurrenceType 
+      ? item.recurrenceType !== 'NONE'
+      : (item.isRecurring || (item.recurringDays && item.recurringDays.length > 0) || (isRecurringClient && !item.recurringDays));
+
+    if (isRecurring) {
+      for (let d = 1; d <= daysInMonth; d++) {
+        const checkDate = new Date(currentYear, currentMonth, d);
+        const checkDateStr = checkDate.toISOString().split('T')[0];
+        if (checkDateOccurs(checkDate, { ...item, type: 'content' })) {
+          stats.contentTotal++;
+          if (item.completedDates?.includes(checkDateStr)) {
+            stats.contentDone++;
+          }
+        }
+      }
+    } else {
+      const itemDate = item.targetDate || item.date;
+      if (itemDate && isInMonth(itemDate)) {
+        stats.contentTotal++;
+        if (item.status === 'POSTED') {
+          stats.contentDone++;
+        }
+      }
+    }
+  });
+
+  client.captures?.forEach((item: any) => {
+    const isRecurring = item.recurrenceType ? item.recurrenceType !== 'NONE' : item.isRecurring;
+    if (isRecurring) {
+      for (let d = 1; d <= daysInMonth; d++) {
+        const checkDate = new Date(currentYear, currentMonth, d);
+        const checkDateStr = checkDate.toISOString().split('T')[0];
+        if (checkDateOccurs(checkDate, { ...item, type: 'capture' })) {
+          stats.capturesTotal++;
+          if (item.completedDates?.includes(checkDateStr)) {
+            stats.capturesDone++;
+          }
+        }
+      }
+    } else {
+      const itemDate = item.date;
+      if (itemDate && isInMonth(itemDate)) {
+        stats.capturesTotal++;
+        if (item.status === 'DONE') {
+          stats.capturesDone++;
+        }
+      }
+    }
+  });
+
+  return stats;
+};
 
 const isContentDelayed = (client: any) => {
   const today = new Date();
@@ -303,12 +399,6 @@ export function Management() {
                       </span>
                     </div>
                   </div>
-                  
-                  {!isPaid && (
-                    <div className="w-6 h-6 rounded-lg bg-white/5 text-text-muted flex items-center justify-center group-hover:bg-accent-coral/20 group-hover:text-accent-coral transition-colors">
-                      <CreditCard size={14} />
-                    </div>
-                  )}
                 </div>
 
                 <div className="mt-4 flex items-center justify-between gap-2">
@@ -359,6 +449,7 @@ export function Management() {
                   <thead>
                     <tr className="bg-white/[0.02] border-b border-white/5 text-[10px] font-bold uppercase tracking-widest text-text-muted">
                       <th className="px-6 py-4">Cliente</th>
+                      <th className="px-6 py-4">Conteúdo / Captação</th>
                       <th className="px-6 py-4">Dono / Sócios</th>
                       <th className="px-6 py-4">Gestor</th>
                       <th className="px-6 py-4">Valor do Plano</th>
@@ -390,6 +481,7 @@ export function Management() {
                   <thead>
                     <tr className="bg-white/[0.02] border-b border-white/5 text-[10px] font-bold uppercase tracking-widest text-text-muted">
                       <th className="px-6 py-4">Cliente</th>
+                      <th className="px-6 py-4">Conteúdo / Captação</th>
                       <th className="px-6 py-4">Dono / Sócios</th>
                       <th className="px-6 py-4">Gestor</th>
                       <th className="px-6 py-4">Valor do Trabalho</th>
@@ -420,6 +512,8 @@ export function Management() {
 }
 
 function ClientRow({ client, updateStatus, isVisible }: any) {
+  const stats = getClientMonthStats(client);
+
   return (
     <tr key={client.id} className="hover:bg-white/[0.01] transition-colors group">
       <td className="px-6 py-4">
@@ -437,6 +531,37 @@ function ClientRow({ client, updateStatus, isVisible }: any) {
             {isContentDelayed(client) && (
               <span className="text-[8px] font-bold text-accent-coral uppercase leading-none mt-0.5">Postagem Atrasada</span>
             )}
+          </div>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="flex flex-col gap-1.5 min-w-[120px]">
+          <div className="flex items-center justify-between gap-4">
+             <div className="flex items-center gap-1.5">
+                <Play size={12} className="text-accent-mint" />
+                <span className="text-[10px] font-bold text-text-muted uppercase tracking-tighter">Vídeos</span>
+             </div>
+             <span className="text-xs font-medium text-white">{stats.contentDone}/{stats.contentTotal}</span>
+          </div>
+          <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+             <div 
+               className="h-full bg-accent-mint transition-all" 
+               style={{ width: `${(stats.contentDone / Math.max(stats.contentTotal, 1)) * 100}%` }} 
+             />
+          </div>
+          
+          <div className="flex items-center justify-between gap-4 mt-1">
+             <div className="flex items-center gap-1.5">
+                <Camera size={12} className="text-fuchsia-400" />
+                <span className="text-[10px] font-bold text-text-muted uppercase tracking-tighter">Captação</span>
+             </div>
+             <span className="text-xs font-medium text-white">{stats.capturesDone}/{stats.capturesTotal}</span>
+          </div>
+          <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+             <div 
+               className="h-full bg-fuchsia-400 transition-all" 
+               style={{ width: `${(stats.capturesDone / Math.max(stats.capturesTotal, 1)) * 100}%` }} 
+             />
           </div>
         </div>
       </td>
