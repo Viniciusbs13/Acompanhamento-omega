@@ -21,6 +21,7 @@ import {
   Play,
   Camera
 } from 'lucide-react';
+import { AreaChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { storage } from '../lib/storage';
 import { Client, ManagementFlag, MonthlyPayment } from '../types';
 import { formatCurrency, cn } from '../lib/utils';
@@ -196,6 +197,49 @@ const isContentDelayed = (client: any) => {
   return false;
 };
 
+const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+const computeStatsForMonth = (clients: Client[], targetMonth: number, targetYear: number) => {
+  const recurringClients = clients.filter(c => {
+    const isRecurring = c.billingModel === 'RECURRING' || !c.billingModel;
+    if (!isRecurring) return false;
+    
+    if (!c.createdAt) return true; 
+    const d = new Date(c.createdAt);
+    const clientYear = d.getFullYear();
+    const clientMonth = d.getMonth();
+    
+    return (clientYear < targetYear) || (clientYear === targetYear && clientMonth <= targetMonth);
+  });
+  
+  const mrr = recurringClients.reduce((acc, c) => acc + (c.planValue || 0), 0);
+  
+  const oneOffClients = clients.filter(c => {
+    const isOneOff = c.billingModel === 'ONE_OFF';
+    if (!isOneOff) return false;
+    
+    if (!c.createdAt) return false;
+    const d = new Date(c.createdAt);
+    return d.getFullYear() === targetYear && d.getMonth() === targetMonth;
+  });
+  
+  const projects = oneOffClients.reduce((acc, c) => acc + (c.planValue || 0), 0);
+  
+  const active = recurringClients.length + oneOffClients.length;
+  const healthy = recurringClients.filter(c => c.managementStatus === 'GREEN').length + 
+                  oneOffClients.filter(c => c.managementStatus === 'GREEN').length;
+                  
+  return {
+    active,
+    mrr,
+    projects,
+    total: mrr + projects,
+    healthy,
+    recurringClients,
+    oneOffClients
+  };
+};
+
 export function Management() {
   const { isVisible } = useVisibility();
   const [clients, setClients] = useState<Client[]>([]);
@@ -203,10 +247,11 @@ export function Management() {
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'progresso'>('portfolio');
+  const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(11);
 
   const currentMonthNum = new Date().getMonth();
   const currentYear = new Date().getFullYear();
-  const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
   useEffect(() => {
     fetchData();
@@ -243,7 +288,7 @@ export function Management() {
         const other = prev.filter(p => p.clientId !== client.id);
         return [...other, payment];
       });
-      toast.success(newStatus === 'PAID' ? `Pagamento de ${client.name} confirmado` : `Pagamento de ${client.name} marcado como pendente`);
+      toast.success(newStatus === 'PAID' ? `Pagamento de ${client.name} confirmed` : `Pagamento de ${client.name} marcado como pendente`);
     } catch (error) {
       toast.error('Erro ao salvar pagamento');
     }
@@ -256,16 +301,41 @@ export function Management() {
     );
     return {
       monthly: base.filter(c => c.billingModel !== 'ONE_OFF'),
-      single: base.filter(c => c.billingModel === 'ONE_OFF')
+      single: base.filter(c => {
+        if (c.billingModel !== 'ONE_OFF') return false;
+        if (!c.createdAt) return false;
+        const d = new Date(c.createdAt);
+        return d.getFullYear() === currentYear && d.getMonth() === currentMonthNum;
+      })
     };
-  }, [clients, searchTerm]);
+  }, [clients, searchTerm, currentMonthNum, currentYear]);
 
   const stats = useMemo(() => {
-    const active = clients.length;
-    const mrr = clients.filter(c => c.billingModel === 'RECURRING' || !c.billingModel).reduce((acc, c) => acc + (c.planValue || 0), 0);
-    const projects = clients.filter(c => c.billingModel === 'ONE_OFF').reduce((acc, c) => acc + (c.planValue || 0), 0);
-    const healthy = clients.filter(c => c.managementStatus === 'GREEN').length;
-    return { active, mrr, projects, healthy };
+    return computeStatsForMonth(clients, currentMonthNum, currentYear);
+  }, [clients, currentMonthNum, currentYear]);
+
+  const monthlyHistory = useMemo(() => {
+    const history = [];
+    const today = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const m = d.getMonth();
+      const y = d.getFullYear();
+      const mStats = computeStatsForMonth(clients, m, y);
+      history.push({
+        month: m,
+        year: y,
+        monthLabel: monthNames[m].substring(0, 3) + '/' + String(y).substring(2),
+        fullLabel: `${monthNames[m]} de ${y}`,
+        mrr: mStats.mrr,
+        projects: mStats.projects,
+        total: mStats.total,
+        active: mStats.active,
+        healthy: mStats.healthy,
+        stats: mStats
+      });
+    }
+    return history;
   }, [clients]);
 
   const updateClientStatus = async (clientId: string, status: ManagementFlag) => {
@@ -311,202 +381,500 @@ export function Management() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <KPICard 
-          label="Recorrência (MRR)" 
-          value={stats.mrr} 
-          isCurrency 
-          icon={<DollarSign size={20} className="text-accent-mint" />}
-          color="accent-mint"
-        />
-        <KPICard 
-          label="Projetos Únicos" 
-          value={stats.projects} 
-          isCurrency 
-          icon={<TrendingUp size={20} className="text-blue-400" />}
-          color="blue-400"
-        />
-        <KPICard 
-          label="Total em Carteira" 
-          value={stats.mrr + stats.projects} 
-          isCurrency 
-          icon={<CheckCircle2 size={20} className="text-fuchsia-400" />}
-          color="fuchsia-400"
-        />
-        <KPICard 
-          label="Status Saudável" 
-          value={`${Math.round((stats.healthy / stats.active) * 100 || 0)}%`} 
-          icon={<CheckCircle2 size={20} className="text-white" />}
-          color="white"
-        />
+      {/* Navegação por Abas */}
+      <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+        <button
+          onClick={() => setActiveTab('portfolio')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all mb-[-1px] border cursor-pointer",
+            activeTab === 'portfolio'
+              ? "bg-accent-mint/10 border-accent-mint/20 text-accent-mint shadow-lg shadow-accent-mint/5"
+              : "border-transparent text-text-secondary hover:text-white"
+          )}
+        >
+          <Briefcase size={16} />
+          Carteira Ativa
+        </button>
+        <button
+          onClick={() => setActiveTab('progresso')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all mb-[-1px] border cursor-pointer",
+            activeTab === 'progresso'
+              ? "bg-accent-mint/10 border-accent-mint/20 text-accent-mint shadow-lg shadow-accent-mint/5"
+              : "border-transparent text-text-secondary hover:text-white"
+          )}
+        >
+          <TrendingUp size={16} />
+          Progresso Mensal
+        </button>
       </div>
 
-      {/* Financeiro / Pagamentos Section */}
-      <div className="space-y-6 pt-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-accent-mint/10 rounded-lg">
-              <Calendar className="text-accent-mint" size={18} />
-            </div>
-            <div>
-              <h2 className="text-lg font-medium tracking-tight">Fluxo de Caixa: {monthNames[currentMonthNum]}</h2>
-              <p className="text-[10px] text-text-muted font-medium uppercase tracking-widest">Confirmação de recebimento mensal</p>
-            </div>
+      {activeTab === 'portfolio' ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <KPICard 
+              label="Recorrência (MRR)" 
+              value={stats.mrr} 
+              isCurrency 
+              icon={<DollarSign size={20} className="text-accent-mint" />}
+              color="accent-mint"
+            />
+            <KPICard 
+              label="Projetos Únicos" 
+              value={stats.projects} 
+              isCurrency 
+              icon={<TrendingUp size={20} className="text-blue-400" />}
+              color="blue-400"
+            />
+            <KPICard 
+              label="Total em Carteira" 
+              value={stats.mrr + stats.projects} 
+              isCurrency 
+              icon={<CheckCircle2 size={20} className="text-fuchsia-400" />}
+              color="fuchsia-400"
+            />
+            <KPICard 
+              label="Status Saudável" 
+              value={`${Math.round((stats.healthy / stats.active) * 100 || 0)}%`} 
+              icon={<CheckCircle2 size={20} className="text-white" />}
+              color="white"
+            />
           </div>
-          <div className="hidden md:flex items-center gap-4">
-             <div className="flex items-center gap-2 px-3 py-1.5 bg-accent-mint/5 rounded-full border border-accent-mint/10">
-                <div className="w-1.5 h-1.5 rounded-full bg-accent-mint animate-pulse" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-accent-mint">Pago</span>
-             </div>
-             <div className="flex items-center gap-2 px-3 py-1.5 bg-accent-coral/5 rounded-full border border-accent-coral/10">
-                <div className="w-1.5 h-1.5 rounded-full bg-accent-coral" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-accent-coral">Pendente</span>
-             </div>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {categorizedClients.monthly.map((client) => {
-            const payment = payments.find(p => p.clientId === client.id);
-            const isPaid = payment?.status === 'PAID';
-            
-            return (
-              <motion.div 
-                key={client.id}
-                whileHover={{ y: -4 }}
-                onClick={() => togglePayment(client)}
-                className={cn(
-                  "glass p-4 rounded-2xl border transition-all cursor-pointer group relative overflow-hidden",
-                  isPaid ? "border-accent-mint/30 bg-accent-mint/[0.03]" : "border-white/5 hover:border-white/10"
-                )}
-              >
-                <div className="flex items-start justify-between gap-3 relative z-10">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-black shrink-0 shadow-lg transition-transform group-hover:scale-105" style={{ backgroundColor: client.brandColor }}>
-                        {client.logo ? <img src={client.logo} className="w-full h-full object-cover rounded-xl" alt="" /> : client.name.charAt(0)}
-                      </div>
-                      {isPaid && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-accent-mint rounded-full flex items-center justify-center text-black shadow-lg border-2 border-bg-base">
-                          <Check size={10} strokeWidth={4} />
+          {/* Financeiro / Pagamentos Section */}
+          <div className="space-y-6 pt-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-accent-mint/10 rounded-lg">
+                  <Calendar className="text-accent-mint" size={18} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-medium tracking-tight">Fluxo de Caixa: {monthNames[currentMonthNum]}</h2>
+                  <p className="text-[10px] text-text-muted font-medium uppercase tracking-widest">Confirmação de recebimento mensal</p>
+                </div>
+              </div>
+              <div className="hidden md:flex items-center gap-4">
+                 <div className="flex items-center gap-2 px-3 py-1.5 bg-accent-mint/5 rounded-full border border-accent-mint/10">
+                    <div className="w-1.5 h-1.5 rounded-full bg-accent-mint animate-pulse" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-accent-mint">Pago</span>
+                 </div>
+                 <div className="flex items-center gap-2 px-3 py-1.5 bg-accent-coral/5 rounded-full border border-accent-coral/10">
+                    <div className="w-1.5 h-1.5 rounded-full bg-accent-coral" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-accent-coral">Pendente</span>
+                 </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {categorizedClients.monthly.map((client) => {
+                const payment = payments.find(p => p.clientId === client.id);
+                const isPaid = payment?.status === 'PAID';
+                
+                return (
+                  <motion.div 
+                    key={client.id}
+                    whileHover={{ y: -4 }}
+                    onClick={() => togglePayment(client)}
+                    className={cn(
+                      "glass p-4 rounded-2xl border transition-all cursor-pointer group relative overflow-hidden",
+                      isPaid ? "border-accent-mint/30 bg-accent-mint/[0.03]" : "border-white/5 hover:border-white/10"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3 relative z-10">
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-black shrink-0 shadow-lg transition-transform group-hover:scale-105" style={{ backgroundColor: client.brandColor }}>
+                            {client.logo ? <img src={client.logo} className="w-full h-full object-cover rounded-xl" alt="" referrerPolicy="no-referrer" /> : client.name.charAt(0)}
+                          </div>
+                          {isPaid && (
+                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-accent-mint rounded-full flex items-center justify-center text-black shadow-lg border-2 border-bg-base">
+                              <Check size={10} strokeWidth={4} />
+                            </div>
+                          )}
                         </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-bold text-xs text-white leading-tight truncate">{client.name}</span>
+                          <span className="text-[10px] text-text-secondary mt-0.5">
+                            {isVisible ? formatCurrency(client.planValue || 0) : '•••••'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between gap-2">
+                       {isPaid ? (
+                         <div className="flex flex-col">
+                            <span className="text-[10px] text-accent-mint font-bold uppercase tracking-tighter">Confirmado</span>
+                            <span className="text-[8px] text-text-muted mt-0.5">{payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('pt-BR') : ''}</span>
+                         </div>
+                       ) : (
+                         <div className="flex flex-col">
+                            <span className="text-[10px] text-accent-coral font-bold uppercase tracking-tighter">Não Recebido</span>
+                            <div className="flex items-center gap-1 mt-0.5">
+                               <div className="w-1 h-1 rounded-full bg-accent-coral animate-pulse" />
+                               <span className="text-[8px] text-text-muted italic">Aguardando...</span>
+                            </div>
+                         </div>
+                       )}
+                       
+                       <button className={cn(
+                         "px-2 py-1 rounded text-[8px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all cursor-pointer",
+                         isPaid ? "hover:bg-accent-coral/20 hover:text-accent-coral text-text-muted" : "bg-accent-mint text-black"
+                       )}>
+                         {isPaid ? 'Estornar' : 'Confirmar'}
+                       </button>
+                    </div>
+                    
+                    {/* Visual indicator corner */}
+                    <div className={cn(
+                      "absolute top-0 right-0 w-8 h-8 -mr-4 -mt-4 rotate-45 transition-colors",
+                      isPaid ? "bg-accent-mint/20" : "bg-transparent"
+                    )} />
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-12">
+            {categorizedClients.monthly.length > 0 && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-accent-mint" />
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Planos Mensais</h3>
+                </div>
+                <div className="glass rounded-3xl overflow-hidden border border-white/5">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-white/[0.02] border-b border-white/5 text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                          <th className="px-6 py-4">Cliente</th>
+                          <th className="px-6 py-4">Conteúdo / Captação</th>
+                          <th className="px-6 py-4">Dono / Sócios</th>
+                          <th className="px-6 py-4">Gestor</th>
+                          <th className="px-6 py-4">Valor do Plano</th>
+                          <th className="px-6 py-4">Status / Flag</th>
+                          <th className="px-6 py-4">Contrato</th>
+                          <th className="px-6 py-4 text-right">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {categorizedClients.monthly.map((client) => (
+                          <ClientRow key={client.id} client={client} updateStatus={updateClientStatus} isVisible={isVisible} />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {categorizedClients.single.length > 0 && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Trabalhos Únicos</h3>
+                </div>
+                <div className="glass rounded-3xl overflow-hidden border border-white/5">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-white/[0.02] border-b border-white/5 text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                          <th className="px-6 py-4">Cliente</th>
+                          <th className="px-6 py-4">Conteúdo / Captação</th>
+                          <th className="px-6 py-4">Dono / Sócios</th>
+                          <th className="px-6 py-4">Gestor</th>
+                          <th className="px-6 py-4">Valor do Trabalho</th>
+                          <th className="px-6 py-4">Status / Flag</th>
+                          <th className="px-6 py-4">Contrato</th>
+                          <th className="px-6 py-4 text-right">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {categorizedClients.single.map((client) => (
+                          <ClientRow key={client.id} client={client} updateStatus={updateClientStatus} isVisible={isVisible} />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {categorizedClients.monthly.length === 0 && categorizedClients.single.length === 0 && (
+              <div className="py-20 text-center glass rounded-3xl border-dashed">
+                <p className="text-text-muted italic">Nenhum cliente encontrado.</p>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="space-y-8 animate-fade-in">
+          {/* Card Gráfico interativo */}
+          <div className="glass rounded-3xl p-6 border border-white/5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Curva de Crescimento</h3>
+                <p className="text-[10px] text-text-secondary mt-1">Evolução do MRR e Projetos Únicos nos últimos 12 meses</p>
+              </div>
+              
+              <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider">
+                <div className="flex items-center gap-1.5 text-accent-mint">
+                  <div className="w-2 h-2 rounded-full bg-accent-mint" />
+                  <span>Recorrência (MRR)</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-blue-400">
+                  <div className="w-2 h-2 rounded-full bg-blue-400" />
+                  <span>Projetos Únicos</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-fuchsia-400">
+                  <div className="w-2 h-2 bg-fuchsia-400 rounded-full" />
+                  <span>Total</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={monthlyHistory}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#d442ff" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#d442ff" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorMrr" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#00ffcc" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#00ffcc" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis 
+                    dataKey="monthLabel" 
+                    stroke="#4B5563" 
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    stroke="#4B5563" 
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => `R$ ${v >= 1000 ? (v / 1000) + 'k' : v}`}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#18181B', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '12px', color: '#fff' }}
+                    labelFormatter={(label, payload) => {
+                      if (payload && payload[0]) {
+                        return payload[0].payload.fullLabel;
+                      }
+                      return label;
+                    }}
+                    formatter={(value: any) => [formatCurrency(value), '']}
+                  />
+                  <Area type="monotone" dataKey="total" stroke="#f44336" strokeWidth={2} fillOpacity={1} fill="url(#colorTotal)" name="Total" />
+                  <Area type="monotone" dataKey="mrr" stroke="#00ffcc" strokeWidth={2} fillOpacity={1} fill="url(#colorMrr)" name="MRR" />
+                  <Line type="monotone" dataKey="projects" stroke="#60a5fa" strokeWidth={2} dot={{ r: 4 }} name="Projetos" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Grid de Meses Clickáveis */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Selecione o Mês para Auditar</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+              {monthlyHistory.map((item, index) => {
+                const isSelected = selectedMonthIndex === index;
+                const prevItem = index > 0 ? monthlyHistory[index - 1] : null;
+                const totalDiff = prevItem ? item.total - prevItem.total : 0;
+                const totalIsUp = totalDiff > 0;
+                const totalIsDown = totalDiff < 0;
+
+                return (
+                  <motion.div
+                    key={item.monthLabel}
+                    whileHover={{ y: -4 }}
+                    onClick={() => setSelectedMonthIndex(index)}
+                    className={cn(
+                      "glass p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden group select-none",
+                      isSelected 
+                        ? "border-accent-mint/40 bg-accent-mint/[0.03] shadow-lg shadow-accent-mint/5" 
+                        : "border-white/5 hover:border-white/10"
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span className={cn(
+                        "text-[10px] font-bold uppercase tracking-wider",
+                        isSelected ? "text-accent-mint font-black" : "text-text-muted"
+                      )}>
+                        {item.monthLabel}
+                      </span>
+                      {totalDiff !== 0 && (
+                        <span className={cn(
+                          "text-[8px] font-bold flex items-center gap-0.5 px-1.5 py-0.5 rounded-full leading-none",
+                          totalIsUp ? "bg-accent-mint/10 text-accent-mint" : "bg-accent-coral/10 text-accent-coral"
+                        )}>
+                          {totalIsUp ? '▲' : '▼'} {formatCurrency(Math.abs(totalDiff)).replace('R$', '').trim()}
+                        </span>
                       )}
                     </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-bold text-xs text-white leading-tight truncate">{client.name}</span>
-                      <span className="text-[10px] text-text-secondary mt-0.5">
-                        {isVisible ? formatCurrency(client.planValue || 0) : '•••••'}
-                      </span>
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-text-muted block">Total Faturado</span>
+                      <p className="text-lg font-semibold text-white tracking-tight leading-none pt-0.5">
+                        {isVisible ? formatCurrency(item.total) : '•••••'}
+                      </p>
                     </div>
+                    
+                    <div className={cn(
+                      "absolute top-0 right-0 w-8 h-8 -mr-4 -mt-4 rotate-45 transition-colors",
+                      isSelected ? "bg-accent-mint/10" : "bg-transparent"
+                    )} />
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Painel do Mês Selecionado */}
+          {selectedMonthIndex !== null && (
+            <div className="space-y-6 pt-4 border-t border-white/5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-medium tracking-tight text-white flex items-center gap-2">
+                    <span>Detalhamento:</span>
+                    <span className="text-accent-mint">{monthlyHistory[selectedMonthIndex].fullLabel}</span>
+                  </h2>
+                  <p className="text-[10px] text-text-muted font-medium uppercase tracking-widest mt-1">Estatísticas consolidada e faturamento por cliente nesse mês</p>
+                </div>
+                <div className="text-[10px] font-bold uppercase text-text-muted italic bg-white/5 px-3 py-1.5 rounded-lg border border-white/5">
+                  Ref: {monthlyHistory[selectedMonthIndex].monthLabel}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <KPICard 
+                  label="Recorrência (MRR)" 
+                  value={monthlyHistory[selectedMonthIndex].mrr} 
+                  isCurrency 
+                  icon={<DollarSign size={20} className="text-accent-mint" />}
+                  color="accent-mint"
+                />
+                <KPICard 
+                  label="Projetos Únicos" 
+                  value={monthlyHistory[selectedMonthIndex].projects} 
+                  isCurrency 
+                  icon={<TrendingUp size={20} className="text-blue-400" />}
+                  color="blue-400"
+                />
+                <KPICard 
+                  label="Total em Carteira" 
+                  value={monthlyHistory[selectedMonthIndex].total} 
+                  isCurrency 
+                  icon={<CheckCircle2 size={20} className="text-fuchsia-400" />}
+                  color="fuchsia-400"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Planos */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-accent-mint" />
+                    Planos Recorrentes Ativos ({monthlyHistory[selectedMonthIndex].stats.recurringClients.length})
+                  </h4>
+                  <div className="glass rounded-2xl border border-white/5 overflow-hidden">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-white/[0.01] border-b border-white/5 text-[9px] font-bold uppercase tracking-wider text-text-muted">
+                          <th className="px-4 py-3">Cliente</th>
+                          <th className="px-4 py-3">Dono</th>
+                          <th className="px-4 py-3 text-right">Valor</th>
+                          <th className="px-4 py-3 text-right">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {monthlyHistory[selectedMonthIndex].stats.recurringClients.map((client: Client) => (
+                          <tr key={client.id} className="hover:bg-white/[0.01] transition-all">
+                            <td className="px-4 py-3 font-medium text-white">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold text-black" style={{ backgroundColor: client.brandColor }}>
+                                  {client.logo ? <img src={client.logo} className="w-full h-full object-cover rounded" alt="" referrerPolicy="no-referrer" /> : client.name.charAt(0)}
+                                </div>
+                                <span className="truncate max-w-[120px]">{client.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-text-secondary truncate max-w-[100px]">{client.ownerNames || '—'}</td>
+                            <td className="px-4 py-3 text-right text-accent-mint font-medium">{isVisible ? formatCurrency(client.planValue || 0) : '•••••'}</td>
+                            <td className="px-4 py-3 text-right">
+                              <Link to={`/clientes/${client.id}`} className="text-text-muted hover:text-white transition-colors">
+                                Ver Carteira ↗
+                              </Link>
+                            </td>
+                          </tr>
+                        ))}
+                        {monthlyHistory[selectedMonthIndex].stats.recurringClients.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="px-4 py-6 text-center text-text-muted italic">Nenhum plano recorrente neste mês.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between gap-2">
-                   {isPaid ? (
-                     <div className="flex flex-col">
-                        <span className="text-[10px] text-accent-mint font-bold uppercase tracking-tighter">Confirmado</span>
-                        <span className="text-[8px] text-text-muted mt-0.5">{payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('pt-BR') : ''}</span>
-                     </div>
-                   ) : (
-                     <div className="flex flex-col">
-                        <span className="text-[10px] text-accent-coral font-bold uppercase tracking-tighter">Não Recebido</span>
-                        <div className="flex items-center gap-1 mt-0.5">
-                           <div className="w-1 h-1 rounded-full bg-accent-coral animate-pulse" />
-                           <span className="text-[8px] text-text-muted italic">Aguardando...</span>
-                        </div>
-                     </div>
-                   )}
-                   
-                   <button className={cn(
-                     "px-2 py-1 rounded text-[8px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all",
-                     isPaid ? "hover:bg-accent-coral/20 hover:text-accent-coral text-text-muted" : "bg-accent-mint text-black"
-                   )}>
-                     {isPaid ? 'Estornar' : 'Confirmar'}
-                   </button>
+                {/* Projetos únicos */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                    Projetos Únicos ({monthlyHistory[selectedMonthIndex].stats.oneOffClients.length})
+                  </h4>
+                  <div className="glass rounded-2xl border border-white/5 overflow-hidden">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-white/[0.01] border-b border-white/5 text-[9px] font-bold uppercase tracking-wider text-text-muted">
+                          <th className="px-4 py-3">Cliente</th>
+                          <th className="px-4 py-3">Dono</th>
+                          <th className="px-4 py-3 text-right">Valor</th>
+                          <th className="px-4 py-3 text-right">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {monthlyHistory[selectedMonthIndex].stats.oneOffClients.map((client: Client) => (
+                          <tr key={client.id} className="hover:bg-white/[0.01] transition-all">
+                            <td className="px-4 py-3 font-medium text-white">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold text-black" style={{ backgroundColor: client.brandColor }}>
+                                  {client.logo ? <img src={client.logo} className="w-full h-full object-cover rounded" alt="" referrerPolicy="no-referrer" /> : client.name.charAt(0)}
+                                </div>
+                                <span className="truncate max-w-[120px]">{client.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-text-secondary truncate max-w-[100px]">{client.ownerNames || '—'}</td>
+                            <td className="px-4 py-3 text-right text-blue-400 font-medium">{isVisible ? formatCurrency(client.planValue || 0) : '•••••'}</td>
+                            <td className="px-4 py-3 text-right">
+                              <Link to={`/clientes/${client.id}`} className="text-text-muted hover:text-white transition-colors">
+                                Ver Carteira ↗
+                              </Link>
+                            </td>
+                          </tr>
+                        ))}
+                        {monthlyHistory[selectedMonthIndex].stats.oneOffClients.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="px-4 py-6 text-center text-text-muted italic">Nenhum projeto único neste mês.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                
-                {/* Visual indicator corner */}
-                <div className={cn(
-                  "absolute top-0 right-0 w-8 h-8 -mr-4 -mt-4 rotate-45 transition-colors",
-                  isPaid ? "bg-accent-mint/20" : "bg-transparent"
-                )} />
-              </motion.div>
-            );
-          })}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-
-      <div className="space-y-12">
-        {categorizedClients.monthly.length > 0 && (
-          <div className="space-y-6">
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-accent-mint" />
-              <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Planos Mensais</h3>
-            </div>
-            <div className="glass rounded-3xl overflow-hidden border border-white/5">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-white/[0.02] border-b border-white/5 text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                      <th className="px-6 py-4">Cliente</th>
-                      <th className="px-6 py-4">Conteúdo / Captação</th>
-                      <th className="px-6 py-4">Dono / Sócios</th>
-                      <th className="px-6 py-4">Gestor</th>
-                      <th className="px-6 py-4">Valor do Plano</th>
-                      <th className="px-6 py-4">Status / Flag</th>
-                      <th className="px-6 py-4">Contrato</th>
-                      <th className="px-6 py-4 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {categorizedClients.monthly.map((client) => (
-                      <ClientRow key={client.id} client={client} updateStatus={updateClientStatus} isVisible={isVisible} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {categorizedClients.single.length > 0 && (
-          <div className="space-y-6">
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-              <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Trabalhos Únicos</h3>
-            </div>
-            <div className="glass rounded-3xl overflow-hidden border border-white/5">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-white/[0.02] border-b border-white/5 text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                      <th className="px-6 py-4">Cliente</th>
-                      <th className="px-6 py-4">Conteúdo / Captação</th>
-                      <th className="px-6 py-4">Dono / Sócios</th>
-                      <th className="px-6 py-4">Gestor</th>
-                      <th className="px-6 py-4">Valor do Trabalho</th>
-                      <th className="px-6 py-4">Status / Flag</th>
-                      <th className="px-6 py-4">Contrato</th>
-                      <th className="px-6 py-4 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {categorizedClients.single.map((client) => (
-                      <ClientRow key={client.id} client={client} updateStatus={updateClientStatus} isVisible={isVisible} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {categorizedClients.monthly.length === 0 && categorizedClients.single.length === 0 && (
-          <div className="py-20 text-center glass rounded-3xl border-dashed">
-            <p className="text-text-muted italic">Nenhum cliente encontrado.</p>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

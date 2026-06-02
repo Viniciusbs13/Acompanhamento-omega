@@ -32,10 +32,12 @@ service cloud.firestore {
       allow get: if isSignedIn() && request.auth.uid == userId;
       allow create: if isSignedIn() && request.auth.uid == userId && 
         incoming().keys().hasAll(['managerName', 'theme']) && 
-        incoming().managerName is string && incoming().managerName.size() <= 100;
+        incoming().managerName is string && incoming().managerName.size() <= 100 &&
+        (!incoming().keys().contains('trafficPanelUrl') || (incoming().trafficPanelUrl is string && incoming().trafficPanelUrl.size() <= 1000));
       allow update: if isSignedIn() && request.auth.uid == userId && 
-        incoming().diff(existing()).affectedKeys().hasOnly(['managerName', 'theme']) &&
-        incoming().managerName is string;
+        incoming().diff(existing()).affectedKeys().hasOnly(['managerName', 'theme', 'trafficPanelUrl']) &&
+        incoming().managerName is string &&
+        (!incoming().keys().contains('trafficPanelUrl') || (incoming().trafficPanelUrl is string && incoming().trafficPanelUrl.size() <= 1000));
     }
 
     // Clients

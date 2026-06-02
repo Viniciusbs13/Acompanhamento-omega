@@ -17,6 +17,7 @@ import { Reports } from './pages/Reports';
 import { Management } from './pages/Management';
 import { Commercial } from './pages/Commercial';
 import { Settings } from './pages/Settings';
+import { TrafficWorkspace } from './pages/TrafficWorkspace';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { VisibilityProvider } from './contexts/VisibilityContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -53,6 +54,7 @@ export default function App() {
               <Route path="/comercial" element={<ErrorBoundary><Commercial /></ErrorBoundary>} />
               <Route path="/gestao" element={<ErrorBoundary><Management /></ErrorBoundary>} />
               <Route path="/relatorios" element={<ErrorBoundary><Reports /></ErrorBoundary>} />
+              <Route path="/trafego" element={<ErrorBoundary><TrafficWorkspace /></ErrorBoundary>} />
               <Route path="/configuracoes" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
             </Route>
             <Route path="*" element={<Navigate to="/login" replace />} />

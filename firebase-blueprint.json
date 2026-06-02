@@ -6,7 +6,8 @@
       "type": "object",
       "properties": {
         "managerName": { "type": "string" },
-        "theme": { "type": "string", "enum": ["light", "dark"] }
+        "theme": { "type": "string", "enum": ["light", "dark"] },
+        "trafficPanelUrl": { "type": "string" }
       },
       "required": ["managerName", "theme"]
     },

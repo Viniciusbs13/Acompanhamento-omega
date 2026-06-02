@@ -176,6 +176,7 @@ export interface CalculatedMetrics {
 export interface UserSettings {
   managerName: string;
   theme: 'light' | 'dark';
+  trafficPanelUrl?: string;
 }
 
 export interface Sale {

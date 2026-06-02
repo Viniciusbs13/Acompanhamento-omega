@@ -14,7 +14,8 @@ import {
   Eye,
   EyeOff,
   DollarSign,
-  Calendar
+  Calendar,
+  Globe
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { cn } from '../lib/utils';
@@ -58,6 +59,7 @@ export function Layout() {
     { label: 'Comercial', icon: DollarSign, path: '/comercial' },
     { label: 'Gestão de Carteira', icon: Briefcase, path: '/gestao' },
     { label: 'Relatórios', icon: FileText, path: '/relatorios' },
+    { label: 'Workspace de Tráfego', icon: Globe, path: '/trafego' },
     { label: 'Configurações', icon: Settings, path: '/configuracoes' },
   ];
 

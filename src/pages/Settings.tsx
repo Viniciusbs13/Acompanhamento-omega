@@ -23,7 +23,8 @@ export function Settings() {
     const formData = new FormData(e.currentTarget);
     const newSettings: UserSettings = {
       managerName: formData.get('managerName') as string,
-      theme: settings?.theme || 'light'
+      theme: settings?.theme || 'light',
+      trafficPanelUrl: formData.get('trafficPanelUrl') as string
     };
     await storage.saveSettings(newSettings);
     setSettings(newSettings);
@@ -80,6 +81,20 @@ export function Settings() {
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 transition-all outline-none" 
                     />
                   </div>
+               </div>
+
+               <div className="space-y-2 pt-2">
+                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">URL do Workspace de Tráfego (iframe)</label>
+                  <input 
+                    name="trafficPanelUrl"
+                    type="text" 
+                    placeholder="Ex: https://lookerstudio.google.com/embed/..."
+                    defaultValue={settings.trafficPanelUrl || ''}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-accent-mint/50 transition-all outline-none font-sans" 
+                  />
+                  <p className="text-[10px] text-text-muted leading-relaxed">
+                    Personalize o painel exibido na aba &quot;Workspace de Tráfego&quot; inserindo o link compartilhável (Looker Studio, Planilhas, Notion, etc.).
+                  </p>
                </div>
 
                <div className="flex justify-end pt-4">
