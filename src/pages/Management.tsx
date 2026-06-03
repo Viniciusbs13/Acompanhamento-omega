@@ -19,11 +19,19 @@ import {
   CreditCard,
   Check,
   Play,
-  Camera
+  Camera,
+  Plus,
+  Filter,
+  Trash2,
+  PiggyBank,
+  Target,
+  Bell,
+  Calculator,
+  AlertCircle
 } from 'lucide-react';
 import { AreaChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { storage } from '../lib/storage';
-import { Client, ManagementFlag, MonthlyPayment } from '../types';
+import { Client, ManagementFlag, MonthlyPayment, FinancialRelease, RecurringBill, FinancialGoal } from '../types';
 import { formatCurrency, cn } from '../lib/utils';
 import { useVisibility } from '../contexts/VisibilityContext';
 import { toast } from 'sonner';
@@ -247,8 +255,38 @@ export function Management() {
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'portfolio' | 'progresso'>('portfolio');
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'progresso' | 'folha'>('portfolio');
   const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(11);
+
+  // FOLHA states
+  const [releases, setReleases] = useState<FinancialRelease[]>([]);
+  const [recurringBills, setRecurringBills] = useState<RecurringBill[]>([]);
+  const [financialGoals, setFinancialGoals] = useState<FinancialGoal[]>([]);
+
+  // Lançamento form
+  const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
+  const [releaseDate, setReleaseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [releaseDescription, setReleaseDescription] = useState('');
+  const [releaseCategory, setReleaseCategory] = useState<any>('Tráfego Pago');
+  const [releaseType, setReleaseType] = useState<any>('RECEITA');
+  const [releaseValue, setReleaseValue] = useState('');
+  const [releaseObservation, setReleaseObservation] = useState('');
+
+  // Recurring bill form
+  const [isBillModalOpen, setIsBillModalOpen] = useState(false);
+  const [billDescription, setBillDescription] = useState('');
+  const [billValue, setBillValue] = useState('');
+  const [billDueDay, setBillDueDay] = useState(10);
+
+  // Goal Form editing
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
+  const [goalTargetValue, setGoalTargetValue] = useState('20000');
+
+  // FOLHA filters state
+  const [folhaFilterMonth, setFolhaFilterMonth] = useState<string>((new Date().getMonth() + 1).toString());
+  const [folhaFilterYear, setFolhaFilterYear] = useState<string>(new Date().getFullYear().toString());
+  const [folhaFilterCategory, setFolhaFilterCategory] = useState<string>('all');
+  const [folhaFilterType, setFolhaFilterType] = useState<string>('all');
 
   const currentMonthNum = new Date().getMonth();
   const currentYear = new Date().getFullYear();
@@ -259,13 +297,24 @@ export function Management() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [clientsData, paymentsData] = await Promise.all([
-      storage.getClients(),
-      storage.getPayments(currentMonthNum, currentYear)
-    ]);
-    setClients(clientsData);
-    setPayments(paymentsData);
-    setLoading(false);
+    try {
+      const [clientsData, paymentsData, releasesData, billsData, goalsData] = await Promise.all([
+        storage.getClients(),
+        storage.getPayments(currentMonthNum, currentYear),
+        storage.getFinancialReleases(),
+        storage.getRecurringBills(),
+        storage.getFinancialGoals()
+      ]);
+      setClients(clientsData);
+      setPayments(paymentsData);
+      setReleases(releasesData);
+      setRecurringBills(billsData);
+      setFinancialGoals(goalsData);
+    } catch (e) {
+      console.error('Error loading finance data: ', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const togglePayment = async (client: Client) => {
@@ -288,11 +337,335 @@ export function Management() {
         const other = prev.filter(p => p.clientId !== client.id);
         return [...other, payment];
       });
-      toast.success(newStatus === 'PAID' ? `Pagamento de ${client.name} confirmed` : `Pagamento de ${client.name} marcado como pendente`);
+      toast.success(newStatus === 'PAID' ? `Pagamento de ${client.name} confirmado` : `Pagamento de ${client.name} marcado como pendente`);
     } catch (error) {
       toast.error('Erro ao salvar pagamento');
     }
   };
+
+  // FOLHA mutation handlers
+  const handleAddRelease = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!releaseDescription || !releaseValue) {
+      toast.error('Por favor, preencha a descrição e o valor.');
+      return;
+    }
+    const val = parseFloat(releaseValue.replace(/[^\d.,]/g, '').replace(',', '.'));
+    if (isNaN(val) || val <= 0) {
+      toast.error('Por favor, insira um valor válido positivo.');
+      return;
+    }
+    
+    // Auto incrementing id
+    const newRelease: FinancialRelease = {
+      id: 'rel_' + Math.random().toString(36).substring(2, 9),
+      date: releaseDate,
+      description: releaseDescription,
+      category: releaseCategory,
+      type: releaseType,
+      value: val,
+      observation: releaseObservation.trim() || undefined
+    };
+
+    try {
+      await storage.saveFinancialRelease(newRelease);
+      setReleases(prev => [newRelease, ...prev]);
+      toast.success('Lançamento registrado com sucesso!');
+      setIsReleaseModalOpen(false);
+      setReleaseDescription('');
+      setReleaseValue('');
+      setReleaseObservation('');
+    } catch (err) {
+      toast.error('Erro ao registrar lançamento.');
+    }
+  };
+
+  const handleDeleteRelease = async (id: string) => {
+    try {
+      await storage.deleteFinancialRelease(id);
+      setReleases(prev => prev.filter(r => r.id !== id));
+      toast.success('Lançamento excluído com sucesso.');
+    } catch (err) {
+      toast.error('Erro ao excluir lançamento.');
+    }
+  };
+
+  const handleAddRecurringBill = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!billDescription || !billValue) {
+      toast.error('Por favor, preencha descrição e valor.');
+      return;
+    }
+    const val = parseFloat(billValue.replace(/[^\d.,]/g, '').replace(',', '.'));
+    if (isNaN(val) || val <= 0) {
+      toast.error('Por favor, insira um valor válido positivo.');
+      return;
+    }
+    const day = parseInt(billDueDay.toString());
+    if (isNaN(day) || day < 1 || day > 31) {
+      toast.error('Dia de vencimento deve ser entre 1 e 31.');
+      return;
+    }
+
+    const newBill: RecurringBill = {
+      id: 'bill_' + Math.random().toString(36).substring(2, 9),
+      description: billDescription,
+      value: val,
+      dueDay: day
+    };
+
+    try {
+      await storage.saveRecurringBill(newBill);
+      setRecurringBills(prev => [...prev, newBill]);
+      toast.success('Despesa recorrente cadastrada!');
+      setIsBillModalOpen(false);
+      setBillDescription('');
+      setBillValue('');
+      setBillDueDay(10);
+    } catch (err) {
+      toast.error('Erro ao cadastrar despesa recorrente.');
+    }
+  };
+
+  const handleDeleteRecurringBill = async (id: string) => {
+    try {
+      await storage.deleteRecurringBill(id);
+      setRecurringBills(prev => prev.filter(b => b.id !== id));
+      toast.success('Despesa recorrente removida.');
+    } catch (err) {
+      toast.error('Erro ao remover despesa.');
+    }
+  };
+
+  // Re-calculate the goal target reactively if month/year changes
+  const activeMonthNum = folhaFilterMonth === 'all' ? currentMonthNum + 1 : parseInt(folhaFilterMonth);
+  const activeYearNum = folhaFilterYear === 'all' ? currentYear : parseInt(folhaFilterYear);
+  const goalId = `${activeYearNum}-${String(activeMonthNum).padStart(2, '0')}`;
+  
+  const currentGoalValue = useMemo(() => {
+    const goal = financialGoals.find(g => g.id === goalId);
+    return goal ? goal.target.toString() : '20000';
+  }, [financialGoals, goalId]);
+
+  useEffect(() => {
+    setGoalTargetValue(currentGoalValue);
+  }, [currentGoalValue]);
+
+  const handleSaveGoal = async () => {
+    const val = parseFloat(goalTargetValue);
+    if (isNaN(val) || val < 0) {
+      toast.error('Valor de meta inválido.');
+      return;
+    }
+
+    const newGoal: FinancialGoal = {
+      id: goalId,
+      target: val,
+      month: activeMonthNum,
+      year: activeYearNum
+    };
+
+    try {
+      await storage.saveFinancialGoal(newGoal);
+      setFinancialGoals(prev => {
+        const other = prev.filter(g => g.id !== goalId);
+        return [...other, newGoal];
+      });
+      setIsEditingGoal(false);
+      toast.success('Meta de faturamento atualizada!');
+    } catch (err) {
+      toast.error('Erro ao salvar meta.');
+    }
+  };
+
+  // Calculations for sums (top finance report cards)
+  const sums = useMemo(() => {
+    let receita = 0;
+    let gastos = 0;
+    let investimentos = 0;
+
+    // Calculate dynamic portfolio revenue based on the filtered period
+    if (folhaFilterMonth !== 'all' && folhaFilterYear !== 'all') {
+      const targetMonth = parseInt(folhaFilterMonth) - 1;
+      const targetYear = parseInt(folhaFilterYear);
+      const mStats = computeStatsForMonth(clients, targetMonth, targetYear);
+      receita = mStats.total;
+    } else if (folhaFilterMonth === 'all' && folhaFilterYear !== 'all') {
+      // Sum the totals for all 12 months of the selected year
+      const targetYear = parseInt(folhaFilterYear);
+      let yearTotal = 0;
+      for (let m = 0; m < 12; m++) {
+        yearTotal += computeStatsForMonth(clients, m, targetYear).total;
+      }
+      receita = yearTotal;
+    } else {
+      // Fallback: use current month's wallet value
+      const mStats = computeStatsForMonth(clients, currentMonthNum, currentYear);
+      receita = mStats.total;
+    }
+
+    releases.forEach(r => {
+      if (folhaFilterMonth !== 'all') {
+        const m = new Date(r.date + "T12:00:00").getMonth() + 1;
+        if (m.toString() !== folhaFilterMonth) return;
+      }
+      if (folhaFilterYear !== 'all') {
+        const y = new Date(r.date + "T12:00:00").getFullYear();
+        if (y.toString() !== folhaFilterYear) return;
+      }
+
+      if (r.type === 'GASTO') {
+        gastos += r.value;
+      } else if (r.type === 'INVESTIMENTO') {
+        investimentos += r.value;
+      }
+    });
+
+    return {
+      receita,
+      gastos,
+      investimentos,
+      lucroLiquido: receita - gastos - investimentos,
+      saldoAtual: receita - gastos
+    };
+  }, [releases, clients, folhaFilterMonth, folhaFilterYear, currentMonthNum, currentYear]);
+
+  // General indicators
+  const indicators = useMemo(() => {
+    const categoryTotals: Record<string, number> = {};
+    const allCategories = ['Tráfego Pago', 'Freelancer', 'Ferramentas', 'Software', 'Assinaturas', 'Equipamentos', 'Marketing', 'Combustível', 'Alimentação', 'Escritório', 'Impostos', 'Outros'];
+    allCategories.forEach(cat => {
+      categoryTotals[cat] = 0;
+    });
+
+    let totalGasto = 0;
+    let totalInvestido = 0;
+    let totalRecebido = sums.receita;
+
+    // Summations inside active filters
+    releases.forEach(r => {
+      if (folhaFilterMonth !== 'all') {
+        const m = new Date(r.date + "T12:00:00").getMonth() + 1;
+        if (m.toString() !== folhaFilterMonth) return;
+      }
+      if (folhaFilterYear !== 'all') {
+        const y = new Date(r.date + "T12:00:00").getFullYear();
+        if (y.toString() !== folhaFilterYear) return;
+      }
+
+      if (r.type === 'GASTO') {
+        categoryTotals[r.category] = (categoryTotals[r.category] || 0) + r.value;
+        totalGasto += r.value;
+      } else if (r.type === 'INVESTIMENTO') {
+        totalInvestido += r.value;
+      }
+    });
+
+    // Averages across all active database months with entries
+    const monthReleases: Record<string, { GASTO: number; RECEITA: number }> = {};
+    releases.forEach(r => {
+      const dt = new Date(r.date + "T12:00:00");
+      const key = `${dt.getFullYear()}-${dt.getMonth() + 1}`;
+      if (!monthReleases[key]) {
+        monthReleases[key] = { GASTO: 0, RECEITA: 0 };
+      }
+      if (r.type === 'GASTO') {
+        monthReleases[key].GASTO += r.value;
+      }
+    });
+
+    // For each month key in monthReleases, let's inject the real portfolio total for that month!
+    Object.keys(monthReleases).forEach(key => {
+      const parts = key.split('-');
+      const year = parseInt(parts[0]);
+      const monthZeroBased = parseInt(parts[1]) - 1;
+      monthReleases[key].RECEITA = computeStatsForMonth(clients, monthZeroBased, year).total;
+    });
+
+    const activeMonthsCount = Object.keys(monthReleases).length || 1;
+    let sumMonthlyGastos = 0;
+    let sumMonthlyReceitas = 0;
+    Object.values(monthReleases).forEach(item => {
+      sumMonthlyGastos += item.GASTO;
+      sumMonthlyReceitas += item.RECEITA;
+    });
+
+    // Ensure we count the current month if monthReleases is empty
+    if (Object.keys(monthReleases).length === 0) {
+      sumMonthlyReceitas = computeStatsForMonth(clients, currentMonthNum, currentYear).total;
+    }
+
+    return {
+      categoryTotals,
+      totalGasto,
+      totalInvestido,
+      totalRecebido,
+      mediaMensalGastos: sumMonthlyGastos / activeMonthsCount,
+      mediaMensalReceita: sumMonthlyReceitas / activeMonthsCount
+    };
+  }, [releases, clients, folhaFilterMonth, folhaFilterYear, currentMonthNum, currentYear, sums.receita]);
+
+  // Sector-based Cost Center consuming
+  const costCenter = useMemo(() => {
+    let operacao = 0;
+    let marketing = 0;
+    let ferramentas = 0;
+    let freelancers = 0;
+    let equipamentos = 0;
+
+    releases.forEach(r => {
+      if (folhaFilterMonth !== 'all') {
+        const m = new Date(r.date + "T12:00:00").getMonth() + 1;
+        if (m.toString() !== folhaFilterMonth) return;
+      }
+      if (folhaFilterYear !== 'all') {
+        const y = new Date(r.date + "T12:00:00").getFullYear();
+        if (y.toString() !== folhaFilterYear) return;
+      }
+
+      if (r.type === 'GASTO' || r.type === 'INVESTIMENTO') {
+        const val = r.value;
+        const cat = r.category;
+
+        if (['Combustível', 'Alimentação', 'Escritório', 'Impostos', 'Outros'].includes(cat)) {
+          operacao += val;
+        } else if (['Tráfego Pago', 'Marketing'].includes(cat)) {
+          marketing += val;
+        } else if (['Ferramentas', 'Software', 'Assinaturas'].includes(cat)) {
+          ferramentas += val;
+        } else if (cat === 'Freelancer') {
+          freelancers += val;
+        } else if (cat === 'Equipamentos') {
+          equipamentos += val;
+        }
+      }
+    });
+
+    return {
+      operacao,
+      marketing,
+      ferramentas,
+      freelancers,
+      equipamentos
+    };
+  }, [releases, folhaFilterMonth, folhaFilterYear]);
+
+  // Full History filter output
+  const filteredReleases = useMemo(() => {
+    return releases.filter(r => {
+      if (folhaFilterMonth !== 'all') {
+        const m = new Date(r.date + "T12:00:00").getMonth() + 1;
+        if (m.toString() !== folhaFilterMonth) return false;
+      }
+      if (folhaFilterYear !== 'all') {
+        const y = new Date(r.date + "T12:00:00").getFullYear();
+        if (y.toString() !== folhaFilterYear) return false;
+      }
+      if (folhaFilterCategory !== 'all' && r.category !== folhaFilterCategory) return false;
+      if (folhaFilterType !== 'all' && r.type !== folhaFilterType) return false;
+      return true;
+    });
+  }, [releases, folhaFilterMonth, folhaFilterYear, folhaFilterCategory, folhaFilterType]);
 
   const categorizedClients = useMemo(() => {
     const base = clients.filter(c => 
@@ -406,6 +779,18 @@ export function Management() {
         >
           <TrendingUp size={16} />
           Progresso Mensal
+        </button>
+        <button
+          onClick={() => setActiveTab('folha')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all mb-[-1px] border cursor-pointer",
+            activeTab === 'folha'
+              ? "bg-accent-mint/10 border-accent-mint/20 text-accent-mint shadow-lg shadow-accent-mint/5"
+              : "border-transparent text-text-secondary hover:text-white"
+          )}
+        >
+          <Calculator size={16} />
+          FOLHA
         </button>
       </div>
 
@@ -608,7 +993,7 @@ export function Management() {
             )}
           </div>
         </>
-      ) : (
+      ) : activeTab === 'progresso' ? (
         <div className="space-y-8 animate-fade-in">
           {/* Card Gráfico interativo */}
           <div className="glass rounded-3xl p-6 border border-white/5 space-y-4">
@@ -873,6 +1258,694 @@ export function Management() {
               </div>
             </div>
           )}
+        </div>
+      ) : (
+        <div className="space-y-8 animate-fade-in text-white">
+          {/* LUCRO REAL BANNER */}
+          <div className="relative overflow-hidden rounded-3xl p-6 bg-gradient-to-r from-accent-mint/15 via-bg-base/20 to-bg-base border border-accent-mint/30 shadow-[0_0_20px_rgba(0,255,204,0.05)]">
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-accent-mint uppercase tracking-widest flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-mint animate-pulse" />
+                  Lucro Real Consolidado
+                </span>
+                <h2 className="text-2xl font-bold tracking-tight">
+                  Lucro Líquido: <span className="text-accent-mint">{formatCurrency(sums.lucroLiquido)}</span>
+                </h2>
+                <p className="text-xs text-text-muted">
+                  Fórmula oficial: <span className="font-mono text-white">LUCRO = RECEITAS ({formatCurrency(sums.receita)}) - GASTOS ({formatCurrency(sums.gastos)}) - INVESTIMENTOS ({formatCurrency(sums.investimentos)})</span>
+                </p>
+              </div>
+              <div className="flex items-center gap-2 bg-white/5 py-2 px-4 rounded-2xl border border-white/5 self-start md:self-auto">
+                <Calculator size={18} className="text-accent-mint" />
+                <div className="text-left font-mono">
+                  <span className="text-[9px] uppercase tracking-wider text-text-muted block leading-none">Saldo Atual</span>
+                  <span className="text-sm font-bold text-white block">
+                    {formatCurrency(sums.saldoAtual)} <span className="text-[9px] font-normal text-text-muted">(Rec. - Gast.)</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="absolute right-0 top-0 w-48 h-48 bg-accent-mint/5 rounded-full blur-[80px]" />
+          </div>
+
+          {/* RESUMO FINANCEIRO */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="glass rounded-3xl p-6 border border-accent-mint/20 space-y-2 hover:border-accent-mint/40 transition-colors shadow-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Receitas Totais</span>
+                <div className="p-2 bg-accent-mint/10 rounded-xl">
+                  <CheckCircle2 size={18} className="text-accent-mint" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-2xl font-bold text-accent-mint tracking-tight">
+                  {isVisible ? formatCurrency(sums.receita) : '•••••'}
+                </h3>
+                <p className="text-[10px] text-text-muted font-medium text-accent-mint/80">Sincronizado da Carteira Ativa</p>
+              </div>
+            </div>
+
+            <div className="glass rounded-3xl p-6 border border-red-500/10 space-y-2 hover:border-red-500/20 transition-colors shadow-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Gastos Totais</span>
+                <div className="p-2 bg-red-400/10 rounded-xl">
+                  <XCircle size={18} className="text-red-400" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-2xl font-bold text-red-400 tracking-tight">
+                  {isVisible ? formatCurrency(sums.gastos) : '•••••'}
+                </h3>
+                <p className="text-[10px] text-text-muted">Saídas operacionais</p>
+              </div>
+            </div>
+
+            <div className="glass rounded-3xl p-6 border border-white/5 space-y-2 hover:border-white/10 transition-colors shadow-lg relative overflow-hidden">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Lucro Líquido</span>
+                <div className="p-2 bg-accent-mint/5 rounded-xl">
+                  <Calculator size={18} className="text-accent-mint" />
+                </div>
+              </div>
+              <div className="space-y-1 relative z-10">
+                <h3 className="text-2xl font-bold text-white tracking-tight drop-shadow-[0_0_15px_rgba(0,255,204,0.15)] flex items-center gap-1.5">
+                  {isVisible ? formatCurrency(sums.lucroLiquido) : '•••••'}
+                  <span className="text-[10px] font-bold text-accent-mint bg-accent-mint/10 px-1.5 py-0.5 rounded-full">Mint</span>
+                </h3>
+                <p className="text-[10px] text-text-muted">Ebitda operacional do mês</p>
+              </div>
+              <div className="absolute top-0 right-0 w-12 h-12 bg-accent-mint/5 rounded-full blur-2xl" />
+            </div>
+
+            <div className="glass rounded-3xl p-6 border border-amber-500/15 space-y-2 hover:border-amber-500/25 transition-colors shadow-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Investimentos</span>
+                <div className="p-2 bg-amber-400/10 rounded-xl">
+                  <TrendingUp size={18} className="text-amber-400" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-2xl font-bold text-amber-400 tracking-tight">
+                  {isVisible ? formatCurrency(sums.investimentos) : '•••••'}
+                </h3>
+                <p className="text-[10px] text-text-muted">Alocações de longo prazo</p>
+              </div>
+            </div>
+          </div>
+
+          {/* FILTROS E LANÇAMENTO FINANCEIRO */}
+          <div className="glass rounded-3xl p-6 border border-white/5 space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/5 rounded-xl">
+                  <Filter size={18} className="text-text-muted" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-white">Filtros Avançados</h4>
+                  <p className="text-[10px] text-text-secondary">Filtrar os lançamentos do histórico financeiro</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1 lg:max-w-3xl">
+                <div>
+                  <label className="text-[9px] font-bold text-text-muted uppercase block mb-1">Mês</label>
+                  <select
+                    value={folhaFilterMonth}
+                    onChange={(e) => setFolhaFilterMonth(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs outline-none focus:border-accent-mint/40 cursor-pointer text-white"
+                  >
+                    <option value="all">Todos os Meses</option>
+                    {monthNames.map((name, idx) => (
+                      <option key={idx} value={(idx + 1).toString()}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-text-muted uppercase block mb-1">Ano</label>
+                  <select
+                    value={folhaFilterYear}
+                    onChange={(e) => setFolhaFilterYear(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs outline-none focus:border-accent-mint/40 cursor-pointer text-white"
+                  >
+                    <option value="all">Todos os Anos</option>
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                    <option value="2027">2027</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-text-muted uppercase block mb-1">Categoria</label>
+                  <select
+                    value={folhaFilterCategory}
+                    onChange={(e) => setFolhaFilterCategory(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs outline-none focus:border-accent-mint/40 cursor-pointer text-white"
+                  >
+                    <option value="all">Todas</option>
+                    <option value="Tráfego Pago">Tráfego Pago</option>
+                    <option value="Freelancer">Freelancer</option>
+                    <option value="Ferramentas">Ferramentas</option>
+                    <option value="Software">Software</option>
+                    <option value="Assinaturas">Assinaturas</option>
+                    <option value="Equipamentos">Equipamentos</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Combustível">Combustível</option>
+                    <option value="Alimentação">Alimentação</option>
+                    <option value="Escritório">Escritório</option>
+                    <option value="Impostos">Impostos</option>
+                    <option value="Outros">Outros</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[9px] font-bold text-text-muted uppercase block mb-1">Tipo</label>
+                  <select
+                    value={folhaFilterType}
+                    onChange={(e) => setFolhaFilterType(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs outline-none focus:border-accent-mint/40 cursor-pointer text-white"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="RECEITA">Receita</option>
+                    <option value="GASTO">Gasto</option>
+                    <option value="INVESTIMENTO">Investimento</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="self-end lg:self-center">
+                <button
+                  type="button"
+                  onClick={() => setIsReleaseModalOpen(true)}
+                  className="bg-accent-mint text-black px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all w-full cursor-pointer"
+                >
+                  <Plus size={16} />
+                  Novo Lançamento
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* MAIN GRID */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            {/* HISTÓRICO FINANCEIRO */}
+            <div className="lg:col-span-8 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-accent-mint" />
+                  Histórico de Lançamentos ({filteredReleases.length})
+                </h3>
+              </div>
+
+              <div className="glass rounded-3xl overflow-hidden border border-white/5">
+                <div className="overflow-x-auto font-sans">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-white/[0.01] border-b border-white/5 text-[9px] font-bold uppercase tracking-widest text-text-muted">
+                        <th className="px-6 py-4">Data</th>
+                        <th className="px-6 py-4">Descrição</th>
+                        <th className="px-6 py-4">Categoria</th>
+                        <th className="px-6 py-4">Tipo</th>
+                        <th className="px-6 py-4 text-right">Valor</th>
+                        <th className="px-6 py-4 text-center">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {filteredReleases
+                        .sort((a, b) => new Date(b.date + "T12:00:00").getTime() - new Date(a.date + "T12:00:00").getTime())
+                        .map((rel) => (
+                          <tr key={rel.id} className="hover:bg-white/[0.01] transition-all group">
+                            <td className="px-6 py-4 font-medium text-text-secondary whitespace-nowrap">
+                              {new Date(rel.date + "T12:00:00").toLocaleDateString('pt-BR')}
+                            </td>
+                            <td className="px-6 py-4 font-semibold text-white">
+                              <div>
+                                <span className="block">{rel.description}</span>
+                                {rel.observation && (
+                                  <span className="block text-[10px] text-text-muted font-normal italic mt-0.5">{rel.observation}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-[10px] bg-white/5 px-2.5 py-1 rounded-full border border-white/5 font-medium whitespace-nowrap">
+                                {rel.category}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              {rel.type === 'RECEITA' ? (
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-accent-mint bg-accent-mint/10 border border-accent-mint/20 px-2 py-0.5 rounded">
+                                  Receita
+                                </span>
+                              ) : rel.type === 'GASTO' ? (
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-red-400 bg-red-400/10 border border-red-400/20 px-2 py-0.5 rounded">
+                                  Gasto
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-bold uppercase tracking-widest text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded">
+                                  Investimento
+                                </span>
+                              )}
+                            </td>
+                            <td className={`px-6 py-4 text-right font-bold font-mono text-xs whitespace-nowrap ${
+                              rel.type === 'RECEITA' ? 'text-accent-mint' : rel.type === 'GASTO' ? 'text-red-400' : 'text-amber-400'
+                            }`}>
+                              {isVisible ? formatCurrency(rel.value) : '•••••'}
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRelease(rel.id)}
+                                className="p-1 px-2 rounded hover:bg-red-500/20 text-text-muted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer border-0 bg-transparent"
+                                title="Deletar"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+
+                      {filteredReleases.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-16 text-center text-text-muted italic">
+                            Nenhum lançamento no filtro selecionado. Adicione clicando em "+ Novo Lançamento".
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* INDICADORES */}
+              <div className="glass rounded-3xl p-6 border border-white/5 space-y-6">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-accent-mint animate-pulse" />
+                    Indicadores Financeiros de Apoio
+                  </h4>
+                  <p className="text-[10px] text-text-secondary mt-1">Estatísticas complementares calculadas sob o período ativo</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-white/[0.02] border border-white/5 p-4 rounded-xl space-y-1">
+                    <span className="text-[9px] text-text-muted uppercase font-bold block">Investimentos Totais</span>
+                    <p className="text-lg font-bold text-amber-400">{formatCurrency(indicators.totalInvestido)}</p>
+                  </div>
+                  <div className="bg-white/[0.02] border border-white/5 p-4 rounded-xl space-y-1">
+                    <span className="text-[9px] text-text-muted uppercase font-bold block">Entradas Totais</span>
+                    <p className="text-lg font-bold text-accent-mint">{formatCurrency(indicators.totalRecebido)}</p>
+                  </div>
+                  <div className="bg-white/[0.02] border border-white/5 p-4 rounded-xl space-y-1">
+                    <span className="text-[9px] text-text-muted uppercase font-bold block">Gasto Médio Mensal</span>
+                    <p className="text-lg font-bold text-red-400">{formatCurrency(indicators.mediaMensalGastos)}</p>
+                    <span className="text-[8px] text-text-muted italic block">Média histórica geral</span>
+                  </div>
+                  <div className="bg-white/[0.02] border border-white/5 p-4 rounded-xl space-y-1">
+                    <span className="text-[9px] text-text-muted uppercase font-bold block">Receita Média Mensal</span>
+                    <p className="text-lg font-bold text-accent-mint">{formatCurrency(indicators.mediaMensalReceita)}</p>
+                    <span className="text-[8px] text-text-muted italic block">Média histórica geral</span>
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-2">
+                  <h5 className="text-[10px] font-bold text-text-muted uppercase tracking-widest text-left">Gastos Detalhados por Categoria</h5>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {Object.entries(indicators.categoryTotals).map(([cat, val]) => (
+                      <div key={cat} className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col justify-between text-left">
+                        <span className="text-[10px] font-medium text-text-secondary truncate">{cat}</span>
+                        <span className="text-xs font-bold text-white mt-1">{formatCurrency(val)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN */}
+            <div className="lg:col-span-4 space-y-8">
+              
+              {/* META FINANCEIRA */}
+              <div className="glass rounded-3xl p-6 border border-white/5 space-y-4 text-left">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Target size={18} className="text-accent-mint" />
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-text-muted">Meta do Faturamento</h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingGoal(!isEditingGoal);
+                    }}
+                    className="text-[10px] text-accent-mint uppercase font-bold hover:underline cursor-pointer bg-transparent border-0"
+                  >
+                    {isEditingGoal ? 'Cancelar' : 'Alterar'}
+                  </button>
+                </div>
+
+                {isEditingGoal ? (
+                  <div className="space-y-3 bg-white/5 p-4 rounded-2xl border border-white/5">
+                    <label className="text-[9px] uppercase font-bold text-text-muted block">Meta Mensal (R$)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        placeholder="Ex: 20000"
+                        value={goalTargetValue}
+                        onChange={(e) => setGoalTargetValue(e.target.value)}
+                        className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3 py-1.5 text-xs outline-none text-white focus:border-accent-mint w-full"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveGoal}
+                        className="bg-accent-mint text-black text-xs font-bold px-3 py-1.5 rounded-xl hover:brightness-110 active:scale-95 transition-all cursor-pointer border-0"
+                      >
+                        Salvar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <span className="text-[10px] text-text-secondary uppercase block">Progresso do Mês</span>
+                        <p className="text-base font-bold text-white mt-1">
+                          {formatCurrency(sums.receita)} <span className="text-xs text-text-muted font-normal">de {formatCurrency(parseFloat(currentGoalValue))}</span>
+                        </p>
+                      </div>
+                      <span className="text-xs font-bold text-accent-mint">
+                        {Math.round((sums.receita / parseFloat(currentGoalValue)) * 100 || 0)}%
+                      </span>
+                    </div>
+
+                    <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden border border-white/5">
+                      <div
+                        className="bg-accent-mint h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(0,255,204,0.5)]"
+                        style={{ width: `${Math.min(100, Math.round((sums.receita / parseFloat(currentGoalValue)) * 100 || 0))}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* CENTRO DE CUSTOS */}
+              <div className="glass rounded-3xl p-6 border border-white/5 space-y-4 text-left">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded bg-accent-mint" />
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-text-muted">Centro de Custos</h4>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.01] border border-white/5">
+                    <span className="text-xs text-text-secondary font-medium">Operação</span>
+                    <span className="text-sm font-bold text-white font-mono">{formatCurrency(costCenter.operacao)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.01] border border-white/5">
+                    <span className="text-xs text-text-secondary font-medium">Marketing</span>
+                    <span className="text-sm font-bold text-white font-mono">{formatCurrency(costCenter.marketing)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.01] border border-white/5">
+                    <span className="text-xs text-text-secondary font-medium">Ferramentas</span>
+                    <span className="text-sm font-bold text-white font-mono">{formatCurrency(costCenter.ferramentas)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.01] border border-white/5">
+                    <span className="text-xs text-text-secondary font-medium">Freelancers</span>
+                    <span className="text-sm font-bold text-white font-mono">{formatCurrency(costCenter.freelancers)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.01] border border-white/5">
+                    <span className="text-xs text-text-secondary font-medium">Equipamentos</span>
+                    <span className="text-sm font-bold text-white font-mono">{formatCurrency(costCenter.equipamentos)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* CONTAS RECORRENTES */}
+              <div className="glass rounded-3xl p-6 border border-white/5 space-y-4 text-left">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <PiggyBank size={18} className="text-accent-mint" />
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-text-muted">Contas Recorrentes</h4>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsBillModalOpen(true)}
+                    className="text-[10px] text-accent-mint uppercase font-bold flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-0"
+                  >
+                    <Plus size={10} /> Add Fixed
+                  </button>
+                </div>
+
+                <div className="space-y-3.5">
+                  {recurringBills.map((bill) => {
+                    const todayDay = new Date().getDate();
+                    const isVencendoHoje = bill.dueDay === todayDay;
+                    const isProximo = (bill.dueDay > todayDay && bill.dueDay - todayDay <= 3);
+                    
+                    return (
+                      <div key={bill.id} className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex items-start justify-between gap-2 transition-colors">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-bold text-white">{bill.description}</span>
+                            {isVencendoHoje && (
+                              <span className="text-[8px] font-bold uppercase text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0 whitespace-nowrap">
+                                <Bell size={8} className="text-red-400 animate-bounce" /> Vence Hoje!
+                              </span>
+                            )}
+                            {isProximo && (
+                              <span className="text-[8px] font-bold uppercase text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0 whitespace-nowrap">
+                                <AlertCircle size={8} className="text-amber-400 animate-pulse" /> Vence em {bill.dueDay - todayDay} ds
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs font-bold text-accent-mint leading-none font-mono mt-0.5">
+                            {formatCurrency(bill.value)} <span className="text-[9px] font-normal text-text-muted">/mês</span>
+                          </p>
+                          <span className="text-[9px] text-text-muted block">Dia vencimento: <span className="text-white font-mono">{bill.dueDay}</span></span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRecurringBill(bill.id)}
+                          className="p-1.5 rounded-lg hover:bg-red-500/20 text-text-muted hover:text-red-400 transition-colors cursor-pointer border-0 bg-transparent"
+                          title="Remover"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  {recurringBills.length === 0 && (
+                    <div className="py-8 text-center text-text-muted italic text-[11px]">
+                      Nenhuma conta fixa cadastrada. Cadastre clicando em "Add Fixed".
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NOVO LANÇAMENTO MODAL */}
+      {isReleaseModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-bg-elevated border border-white/10 rounded-3xl p-6 w-full max-w-lg space-y-6 shadow-2xl relative text-left"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white">Registrar Lançamento Financeiro</h3>
+              <button
+                type="button"
+                onClick={() => setIsReleaseModalOpen(false)}
+                className="text-text-muted hover:text-white text-lg font-bold cursor-pointer bg-transparent border-none outline-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddRelease} className="space-y-4 text-white">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-text-muted uppercase block mb-1">Data</label>
+                  <input
+                    type="date"
+                    required
+                    value={releaseDate}
+                    onChange={(e) => setReleaseDate(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs outline-none text-white focus:border-accent-mint"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-text-muted uppercase block mb-1">Valor (R$)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: 150,00"
+                    value={releaseValue}
+                    onChange={(e) => setReleaseValue(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs outline-none text-white focus:border-accent-mint"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-text-muted uppercase block mb-1">Descrição</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Licença da ferramenta X"
+                  value={releaseDescription}
+                  onChange={(e) => setReleaseDescription(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs outline-none text-white focus:border-accent-mint"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-text-muted uppercase block mb-1">Tipo de Movimentação</label>
+                  <select
+                    value={releaseType}
+                    onChange={(e) => setReleaseType(e.target.value as any)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs outline-none text-white focus:border-accent-mint cursor-pointer"
+                  >
+                    <option value="RECEITA">Receita</option>
+                    <option value="GASTO">Gasto (Despesa)</option>
+                    <option value="INVESTIMENTO">Investimento</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-text-muted uppercase block mb-1">Categoria</label>
+                  <select
+                    value={releaseCategory}
+                    onChange={(e) => setReleaseCategory(e.target.value as any)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs outline-none text-white focus:border-accent-mint cursor-pointer"
+                  >
+                    <option value="Tráfego Pago">Tráfego Pago</option>
+                    <option value="Freelancer">Freelancer</option>
+                    <option value="Ferramentas">Ferramentas</option>
+                    <option value="Software">Software</option>
+                    <option value="Assinaturas">Assinaturas</option>
+                    <option value="Equipamentos">Equipamentos</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Combustível">Combustível</option>
+                    <option value="Alimentação">Alimentação</option>
+                    <option value="Escritório">Escritório</option>
+                    <option value="Impostos">Impostos</option>
+                    <option value="Outros">Outros</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-text-muted uppercase block mb-1">Observação (Opcional)</label>
+                <textarea
+                  placeholder="Ex: Referente ao projeto do cliente X"
+                  value={releaseObservation}
+                  onChange={(e) => setReleaseObservation(e.target.value)}
+                  rows={2}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs outline-none text-white focus:border-accent-mint resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsReleaseModalOpen(false)}
+                  className="flex-1 bg-white/5 border border-white/10 text-white rounded-xl py-2.5 text-xs font-bold hover:bg-white/10 transition-all cursor-pointer border-0"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-accent-mint text-black rounded-xl py-2.5 text-xs font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none"
+                >
+                  Confirmar Lançamento
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ADICIONAR CONTA RECORRENTE MODAL */}
+      {isBillModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-bg-elevated border border-white/10 rounded-3xl p-6 w-full max-w-sm space-y-6 shadow-2xl relative text-left"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white">Nova Conta Recorrente</h3>
+              <button
+                type="button"
+                onClick={() => setIsBillModalOpen(false)}
+                className="text-text-muted hover:text-white text-lg font-bold cursor-pointer bg-transparent border-none outline-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddRecurringBill} className="space-y-4 text-white font-sans">
+              <div>
+                <label className="text-[10px] font-bold text-text-muted uppercase block mb-1">Descrição / Fornecedor</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: ChatGPT Plus, Adobe"
+                  value={billDescription}
+                  onChange={(e) => setBillDescription(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs outline-none text-white focus:border-accent-mint shadow-inner"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-text-muted uppercase block mb-1">Valor Mensal (R$)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: 120,00"
+                    value={billValue}
+                    onChange={(e) => setBillValue(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs outline-none text-white focus:border-accent-mint"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-text-muted uppercase block mb-1">Dia do Vencimento</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    required
+                    value={billDueDay}
+                    onChange={(e) => setBillDueDay(parseInt(e.target.value))}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-xs outline-none text-white focus:border-accent-mint"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBillModalOpen(false)}
+                  className="flex-1 bg-white/5 border border-white/10 text-white rounded-xl py-2.5 text-xs font-bold hover:bg-white/10 transition-all cursor-pointer border-0"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-accent-mint text-black rounded-xl py-2.5 text-xs font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none"
+                >
+                  Adicionar Conta
+                </button>
+              </div>
+            </form>
+          </motion.div>
         </div>
       )}
     </div>

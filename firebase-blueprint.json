@@ -105,6 +105,45 @@
         "ownerId": { "type": "string" }
       },
       "required": ["month", "year", "target", "ownerId"]
+    },
+    "FinancialRelease": {
+      "title": "Financial Release",
+      "description": "A single financial lease/transaction record.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "type": { "type": "string", "enum": ["RECEITA", "GASTO", "INVESTIMENTO"] },
+        "value": { "type": "number" },
+        "observation": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["date", "description", "category", "type", "value", "ownerId"]
+    },
+    "RecurringBill": {
+      "title": "Recurring Bill",
+      "description": "A recurring fixed account/bill.",
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "value": { "type": "number" },
+        "dueDay": { "type": "number" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["description", "value", "dueDay", "ownerId"]
+    },
+    "FinancialGoal": {
+      "title": "Financial Goal",
+      "description": "Monthly financial goal.",
+      "type": "object",
+      "properties": {
+        "month": { "type": "number" },
+        "year": { "type": "number" },
+        "target": { "type": "number" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["month", "year", "target", "ownerId"]
     }
   },
   "firestore": {
@@ -127,6 +166,18 @@
     "/goals/{goalId}": {
       "schema": "CommercialGoal",
       "description": "Goals collection."
+    },
+    "/financial_releases/{releaseId}": {
+      "schema": "FinancialRelease",
+      "description": "Collection of all companies' manual financial releases."
+    },
+    "/recurring_bills/{billId}": {
+      "schema": "RecurringBill",
+      "description": "Collection of recurring fixed accounts/bills."
+    },
+    "/financial_goals/{goalId}": {
+      "schema": "FinancialGoal",
+      "description": "Collection of financial monthly goals."
     }
   }
 }

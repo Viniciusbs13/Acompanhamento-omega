@@ -1,5 +1,5 @@
 import { firebaseStorage } from './firebaseStorage';
-import { Client, MetricEntry, UserSettings, Sale, CommercialGoal, MonthlyPayment } from '../types';
+import { Client, MetricEntry, UserSettings, Sale, CommercialGoal, MonthlyPayment, FinancialRelease, RecurringBill, FinancialGoal } from '../types';
 
 export const storage = {
   // Payments
@@ -70,5 +70,38 @@ export const storage = {
 
   saveGoal: async (goal: CommercialGoal) => {
     await firebaseStorage.saveGoal(goal);
+  },
+
+  // FOLHA
+  getFinancialReleases: async (): Promise<FinancialRelease[]> => {
+    return await firebaseStorage.getFinancialReleases();
+  },
+
+  saveFinancialRelease: async (release: FinancialRelease) => {
+    await firebaseStorage.saveFinancialRelease(release);
+  },
+
+  deleteFinancialRelease: async (id: string) => {
+    await firebaseStorage.deleteFinancialRelease(id);
+  },
+
+  getRecurringBills: async (): Promise<RecurringBill[]> => {
+    return await firebaseStorage.getRecurringBills();
+  },
+
+  saveRecurringBill: async (bill: RecurringBill) => {
+    await firebaseStorage.saveRecurringBill(bill);
+  },
+
+  deleteRecurringBill: async (id: string) => {
+    await firebaseStorage.deleteRecurringBill(id);
+  },
+
+  getFinancialGoals: async (): Promise<FinancialGoal[]> => {
+    return await firebaseStorage.getFinancialGoals();
+  },
+
+  saveFinancialGoal: async (goal: FinancialGoal) => {
+    await firebaseStorage.saveFinancialGoal(goal);
   }
 };

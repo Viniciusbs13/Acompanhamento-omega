@@ -219,3 +219,48 @@ export interface MonthlyPayment {
   paidAt?: string;
   ownerId?: string;
 }
+
+export type FinancialReleaseType = 'RECEITA' | 'GASTO' | 'INVESTIMENTO';
+
+export type FinancialReleaseCategory =
+  | 'Tráfego Pago'
+  | 'Freelancer'
+  | 'Ferramentas'
+  | 'Software'
+  | 'Assinaturas'
+  | 'Equipamentos'
+  | 'Marketing'
+  | 'Combustível'
+  | 'Alimentação'
+  | 'Escritório'
+  | 'Impostos'
+  | 'Outros';
+
+export interface FinancialRelease {
+  id: string;
+  date: string;
+  description: string;
+  category: FinancialReleaseCategory;
+  type: FinancialReleaseType;
+  value: number;
+  observation?: string;
+  ownerId?: string;
+  createdAt?: string;
+}
+
+export interface RecurringBill {
+  id: string;
+  description: string;
+  value: number;
+  dueDay: number;
+  ownerId?: string;
+}
+
+export interface FinancialGoal {
+  id: string;
+  target: number;
+  month: number;
+  year: number;
+  ownerId?: string;
+}
+

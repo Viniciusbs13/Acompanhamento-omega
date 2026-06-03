@@ -12,7 +12,7 @@ import {
   collectionGroup
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import { Client, MetricEntry, UserSettings, Sale, CommercialGoal, MonthlyPayment } from '../types';
+import { Client, MetricEntry, UserSettings, Sale, CommercialGoal, MonthlyPayment, FinancialRelease, RecurringBill, FinancialGoal } from '../types';
 
 enum OperationType {
   CREATE = 'create',
@@ -78,6 +78,9 @@ const USERS_COL = 'users';
 const SALES_COL = 'sales';
 const GOALS_COL = 'goals';
 const PAYMENTS_COL = 'payments';
+const FINANCIAL_RELEASES_COL = 'financial_releases';
+const RECURRING_BILLS_COL = 'recurring_bills';
+const FINANCIAL_GOALS_COL = 'financial_goals';
 
 export const firebaseStorage = {
   // Payments
@@ -302,6 +305,116 @@ export const firebaseStorage = {
     const path = `${USERS_COL}/${auth.currentUser.uid}`;
     try {
       await setDoc(doc(db, USERS_COL, auth.currentUser.uid), cleanData(settings), { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  // FOLHA - Financial Releases (Lançamentos Financeiros)
+  getFinancialReleases: async (): Promise<FinancialRelease[]> => {
+    if (!auth.currentUser) return [];
+    const path = FINANCIAL_RELEASES_COL;
+    try {
+      const q = query(
+        collection(db, path),
+        where('ownerId', '==', auth.currentUser.uid)
+      );
+      const snapshot = await getDocs(q);
+      const releases = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as FinancialRelease));
+      releases.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      return releases;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  saveFinancialRelease: async (release: FinancialRelease) => {
+    if (!auth.currentUser) return;
+    const path = `${FINANCIAL_RELEASES_COL}/${release.id}`;
+    try {
+      await setDoc(doc(db, FINANCIAL_RELEASES_COL, release.id), cleanData({
+        ...release,
+        ownerId: auth.currentUser.uid
+      }), { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  deleteFinancialRelease: async (id: string) => {
+    const path = `${FINANCIAL_RELEASES_COL}/${id}`;
+    try {
+      await deleteDoc(doc(db, FINANCIAL_RELEASES_COL, id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  // FOLHA - Recurring Bills (Contas Recorrentes)
+  getRecurringBills: async (): Promise<RecurringBill[]> => {
+    if (!auth.currentUser) return [];
+    const path = RECURRING_BILLS_COL;
+    try {
+      const q = query(
+        collection(db, path),
+        where('ownerId', '==', auth.currentUser.uid)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as RecurringBill));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  saveRecurringBill: async (bill: RecurringBill) => {
+    if (!auth.currentUser) return;
+    const path = `${RECURRING_BILLS_COL}/${bill.id}`;
+    try {
+      await setDoc(doc(db, RECURRING_BILLS_COL, bill.id), cleanData({
+        ...bill,
+        ownerId: auth.currentUser.uid
+      }), { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  deleteRecurringBill: async (id: string) => {
+    const path = `${RECURRING_BILLS_COL}/${id}`;
+    try {
+      await deleteDoc(doc(db, RECURRING_BILLS_COL, id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  // FOLHA - Financial Goals (Metas Financeiras)
+  getFinancialGoals: async (): Promise<FinancialGoal[]> => {
+    if (!auth.currentUser) return [];
+    const path = FINANCIAL_GOALS_COL;
+    try {
+      const q = query(
+        collection(db, path),
+        where('ownerId', '==', auth.currentUser.uid)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as FinancialGoal));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  saveFinancialGoal: async (goal: FinancialGoal) => {
+    if (!auth.currentUser) return;
+    const path = `${FINANCIAL_GOALS_COL}/${goal.id}`;
+    try {
+      await setDoc(doc(db, FINANCIAL_GOALS_COL, goal.id), cleanData({
+        ...goal,
+        ownerId: auth.currentUser.uid
+      }), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }

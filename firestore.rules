@@ -135,5 +135,59 @@ service cloud.firestore {
                     incoming().ownerId == existing().ownerId;
       allow delete: if isSignedIn() && isOwner(existing());
     }
+
+    // Financial Releases (FOLHA)
+    match /financial_releases/{releaseId} {
+      function isValidRelease(data) {
+        return data.date is string && data.date.size() <= 64 &&
+               data.description is string && data.description.size() <= 300 &&
+               data.category in ['Tráfego Pago', 'Freelancer', 'Ferramentas', 'Software', 'Assinaturas', 'Equipamentos', 'Marketing', 'Combustível', 'Alimentação', 'Escritório', 'Impostos', 'Outros'] &&
+               data.type in ['RECEITA', 'GASTO', 'INVESTIMENTO'] &&
+               data.value is number &&
+               (!data.keys().contains('observation') || (data.observation is string && data.observation.size() <= 1000)) &&
+               data.ownerId == request.auth.uid;
+      }
+
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(releaseId) && isValidRelease(incoming());
+      allow update: if isSignedIn() && isOwner(existing()) && isValidRelease(incoming()) &&
+                    incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() && isOwner(existing());
+    }
+
+    // Recurring Bills
+    match /recurring_bills/{billId} {
+      function isValidBill(data) {
+        return data.description is string && data.description.size() <= 300 &&
+               data.value is number &&
+               data.dueDay is number && data.dueDay >= 1 && data.dueDay <= 31 &&
+               data.ownerId == request.auth.uid;
+      }
+
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(billId) && isValidBill(incoming());
+      allow update: if isSignedIn() && isOwner(existing()) && isValidBill(incoming()) &&
+                    incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() && isOwner(existing());
+    }
+
+    // Financial Goals
+    match /financial_goals/{goalId} {
+      function isValidFinancialGoal(data) {
+        return data.month is number &&
+               data.year is number &&
+               data.target is number &&
+               data.ownerId == request.auth.uid;
+      }
+
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(goalId) && isValidFinancialGoal(incoming());
+      allow update: if isSignedIn() && isOwner(existing()) && isValidFinancialGoal(incoming()) &&
+                    incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() && isOwner(existing());
+    }
   }
 }
