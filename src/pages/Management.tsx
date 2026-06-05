@@ -553,8 +553,11 @@ export function Management() {
         if (y.toString() !== folhaFilterYear) return;
       }
 
-      if (r.type === 'GASTO') {
+      if (r.type === 'GASTO' || r.type === 'INVESTIMENTO') {
         categoryTotals[r.category] = (categoryTotals[r.category] || 0) + r.value;
+      }
+      
+      if (r.type === 'GASTO') {
         totalGasto += r.value;
       } else if (r.type === 'INVESTIMENTO') {
         totalInvestido += r.value;
@@ -1569,7 +1572,7 @@ export function Management() {
                 </div>
 
                 <div className="space-y-4 pt-2">
-                  <h5 className="text-[10px] font-bold text-text-muted uppercase tracking-widest text-left">Gastos Detalhados por Categoria</h5>
+                  <h5 className="text-[10px] font-bold text-text-muted uppercase tracking-widest text-left">Saídas Detalhadas por Categoria (Gastos + Investimentos)</h5>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                     {Object.entries(indicators.categoryTotals).map(([cat, val]) => (
                       <div key={cat} className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col justify-between text-left">
