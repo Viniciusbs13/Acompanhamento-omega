@@ -278,7 +278,21 @@ export function TrafficWorkspace() {
         setSelectedCreative(payload);
       }
     } catch (err) {
-      toast.error('Erro ao salvar criativo');
+      console.error('Save creative error:', err);
+      let errorMsg = 'Erro ao salvar criativo';
+      if (err instanceof Error) {
+        try {
+          const parsed = JSON.parse(err.message);
+          if (parsed && parsed.error) {
+            errorMsg += `: ${parsed.error}`;
+          } else {
+            errorMsg += `: ${err.message}`;
+          }
+        } catch {
+          errorMsg += `: ${err.message}`;
+        }
+      }
+      toast.error(errorMsg);
     }
   };
 

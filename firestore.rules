@@ -12,7 +12,7 @@ service cloud.firestore {
     }
 
     function isOwner(obj) {
-      return isSignedIn() && obj.ownerId == request.auth.uid;
+      return isSignedIn() && (!('ownerId' in obj) || obj.ownerId == request.auth.uid);
     }
 
     function isValidId(id) {
@@ -62,7 +62,7 @@ service cloud.firestore {
       match /entries/{entryId} {
         function isValidEntry(data, cid) {
           return data.clientId == cid &&
-                 (data.investment is number || data.investment is int) &&
+                 (data.investment is int || data.investment is float) &&
                  data.date is string &&
                  data.ownerId == request.auth.uid;
         }
@@ -85,7 +85,7 @@ service cloud.firestore {
     match /sales/{saleId} {
       function isValidSale(data) {
         return data.clientId is string && data.clientId.size() <= 128 &&
-               data.value is number &&
+               (data.value is int || data.value is float) &&
                data.date is string && data.date.size() <= 64 &&
                data.status in ['PAID', 'PENDING'] &&
                data.ownerId == request.auth.uid;
@@ -102,9 +102,9 @@ service cloud.firestore {
     // Commercial Goals
     match /goals/{goalId} {
       function isValidGoal(data) {
-        return data.month is number &&
-               data.year is number &&
-               data.target is number &&
+        return (data.month is int || data.month is float) &&
+               (data.year is int || data.year is float) &&
+               (data.target is int || data.target is float) &&
                (data.get('notes', '') is string) &&
                data.ownerId == request.auth.uid;
       }
@@ -121,10 +121,10 @@ service cloud.firestore {
     match /payments/{paymentId} {
       function isValidPayment(data) {
         return data.clientId is string &&
-               data.month is number &&
-               data.year is number &&
+               (data.month is int || data.month is float) &&
+               (data.year is int || data.year is float) &&
                data.status in ['PAID', 'PENDING'] &&
-               data.value is number &&
+               (data.value is int || data.value is float) &&
                data.ownerId == request.auth.uid;
       }
 
@@ -143,7 +143,7 @@ service cloud.firestore {
                data.description is string && data.description.size() <= 300 &&
                data.category in ['Tráfego Pago', 'Freelancer', 'Ferramentas', 'Software', 'Assinaturas', 'Equipamentos', 'Marketing', 'Combustível', 'Alimentação', 'Escritório', 'Impostos', 'Outros'] &&
                data.type in ['RECEITA', 'GASTO', 'INVESTIMENTO'] &&
-               data.value is number &&
+               (data.value is int || data.value is float) &&
                (!data.keys().contains('observation') || (data.observation is string && data.observation.size() <= 1000)) &&
                data.ownerId == request.auth.uid;
       }
@@ -160,8 +160,8 @@ service cloud.firestore {
     match /recurring_bills/{billId} {
       function isValidBill(data) {
         return data.description is string && data.description.size() <= 300 &&
-               data.value is number &&
-               data.dueDay is number && data.dueDay >= 1 && data.dueDay <= 31 &&
+               (data.value is int || data.value is float) &&
+               (data.dueDay is int || data.dueDay is float) && data.dueDay >= 1 && data.dueDay <= 31 &&
                data.ownerId == request.auth.uid;
       }
 
@@ -176,9 +176,9 @@ service cloud.firestore {
     // Financial Goals
     match /financial_goals/{goalId} {
       function isValidFinancialGoal(data) {
-        return data.month is number &&
-               data.year is number &&
-               data.target is number &&
+        return (data.month is int || data.month is float) &&
+               (data.year is int || data.year is float) &&
+               (data.target is int || data.target is float) &&
                data.ownerId == request.auth.uid;
       }
 
@@ -199,18 +199,12 @@ service cloud.firestore {
                data.type is string &&
                data.objective is string &&
                data.creationDate is string &&
-               (!data.keys().contains('publishDate') || data.publishDate is string) &&
-               (!data.keys().contains('validationDate') || data.validationDate is string) &&
-               (data.rating is int || data.rating is float) && data.rating >= 1 && data.rating <= 5 &&
-               (!data.keys().contains('validationReason') || data.validationReason is string) &&
-               (!data.keys().contains('script') || data.script is string) &&
-               (!data.keys().contains('observations') || data.observations is string) &&
-               (!data.keys().contains('learnings') || data.learnings is string) &&
+               data.rating is number && data.rating >= 1 && data.rating <= 5 &&
                data.ownerId == request.auth.uid;
       }
 
-      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
-      allow get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow list: if isSignedIn() && (!('ownerId' in resource.data) || resource.data.ownerId == request.auth.uid);
+      allow get: if isSignedIn() && (!('ownerId' in resource.data) || resource.data.ownerId == request.auth.uid);
       allow create: if isSignedIn() && isValidId(creativeId) && isValidCreative(incoming());
       allow update: if isSignedIn() && isOwner(existing()) && isValidCreative(incoming()) &&
                     incoming().ownerId == existing().ownerId;
