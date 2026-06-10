@@ -189,5 +189,32 @@ service cloud.firestore {
                     incoming().ownerId == existing().ownerId;
       allow delete: if isSignedIn() && isOwner(existing());
     }
+
+    // Creatives (Traffic Creative Intelligence)
+    match /creatives/{creativeId} {
+      function isValidCreative(data) {
+        return data.code is string &&
+               data.title is string && data.title.size() <= 200 &&
+               data.status in ['IDEIA', 'PRODUZIDO', 'VALIDADO', 'DESCARTADO'] &&
+               data.type is string &&
+               data.objective is string &&
+               data.creationDate is string &&
+               (!data.keys().contains('publishDate') || data.publishDate is string) &&
+               (!data.keys().contains('validationDate') || data.validationDate is string) &&
+               (data.rating is int || data.rating is float) && data.rating >= 1 && data.rating <= 5 &&
+               (!data.keys().contains('validationReason') || data.validationReason is string) &&
+               (!data.keys().contains('script') || data.script is string) &&
+               (!data.keys().contains('observations') || data.observations is string) &&
+               (!data.keys().contains('learnings') || data.learnings is string) &&
+               data.ownerId == request.auth.uid;
+      }
+
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(creativeId) && isValidCreative(incoming());
+      allow update: if isSignedIn() && isOwner(existing()) && isValidCreative(incoming()) &&
+                    incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() && isOwner(existing());
+    }
   }
 }

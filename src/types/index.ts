@@ -264,3 +264,24 @@ export interface FinancialGoal {
   ownerId?: string;
 }
 
+export type CreativeStatus = 'IDEIA' | 'PRODUZIDO' | 'VALIDADO' | 'DESCARTADO';
+
+export interface Creative {
+  id: string;
+  code: string; // AD001, AD002, etc.
+  title: string;
+  status: CreativeStatus;
+  type: string;
+  objective: string;
+  creationDate: string; // YYYY-MM-DD
+  publishDate?: string; // YYYY-MM-DD (optional)
+  validationDate?: string; // YYYY-MM-DD (optional)
+  rating: number; // 1-5 stars
+  validationReason?: string; // Motivo da validação
+  script?: string; // Roteiro (large text)
+  observations?: string; // Observações
+  learnings?: string; // Aprendizados (large text)
+  ownerId?: string;
+}
+
+

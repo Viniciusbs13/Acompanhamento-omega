@@ -12,7 +12,7 @@ import {
   collectionGroup
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import { Client, MetricEntry, UserSettings, Sale, CommercialGoal, MonthlyPayment, FinancialRelease, RecurringBill, FinancialGoal } from '../types';
+import { Client, MetricEntry, UserSettings, Sale, CommercialGoal, MonthlyPayment, FinancialRelease, RecurringBill, FinancialGoal, Creative } from '../types';
 
 enum OperationType {
   CREATE = 'create',
@@ -81,6 +81,7 @@ const PAYMENTS_COL = 'payments';
 const FINANCIAL_RELEASES_COL = 'financial_releases';
 const RECURRING_BILLS_COL = 'recurring_bills';
 const FINANCIAL_GOALS_COL = 'financial_goals';
+const CREATIVES_COL = 'creatives';
 
 export const firebaseStorage = {
   // Payments
@@ -418,5 +419,45 @@ export const firebaseStorage = {
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
+  },
+
+  // CREATIVES Section (Banco de Criativos)
+  getCreatives: async (): Promise<Creative[]> => {
+    if (!auth.currentUser) return [];
+    const path = CREATIVES_COL;
+    try {
+      const q = query(
+        collection(db, path),
+        where('ownerId', '==', auth.currentUser.uid)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Creative));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  saveCreative: async (creative: Creative) => {
+    if (!auth.currentUser) return;
+    const path = `${CREATIVES_COL}/${creative.id}`;
+    try {
+      await setDoc(doc(db, CREATIVES_COL, creative.id), cleanData({
+        ...creative,
+        ownerId: auth.currentUser.uid
+      }), { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  deleteCreative: async (id: string) => {
+    const path = `${CREATIVES_COL}/${id}`;
+    try {
+      await deleteDoc(doc(db, CREATIVES_COL, id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
   }
 };
+

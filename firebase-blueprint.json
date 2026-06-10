@@ -144,9 +144,35 @@
         "ownerId": { "type": "string" }
       },
       "required": ["month", "year", "target", "ownerId"]
+    },
+    "Creative": {
+      "title": "Creative Intelligence",
+      "description": "An advertisement creative stored in the Omega creative bank.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string", "enum": ["IDEIA", "PRODUZIDO", "VALIDADO", "DESCARTADO"] },
+        "type": { "type": "string" },
+        "objective": { "type": "string" },
+        "creationDate": { "type": "string" },
+        "publishDate": { "type": "string" },
+        "validationDate": { "type": "string" },
+        "rating": { "type": "number" },
+        "validationReason": { "type": "string" },
+        "script": { "type": "string" },
+        "observations": { "type": "string" },
+        "learnings": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["code", "title", "status", "type", "objective", "creationDate", "rating", "ownerId"]
     }
   },
   "firestore": {
+    "/creatives/{creativeId}": {
+      "schema": "Creative",
+      "description": "Traffic Creative intelligence library."
+    },
     "/users/{userId}": {
       "schema": "User",
       "description": "User profile and settings."

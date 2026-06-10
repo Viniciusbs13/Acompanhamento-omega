@@ -1,5 +1,5 @@
 import { firebaseStorage } from './firebaseStorage';
-import { Client, MetricEntry, UserSettings, Sale, CommercialGoal, MonthlyPayment, FinancialRelease, RecurringBill, FinancialGoal } from '../types';
+import { Client, MetricEntry, UserSettings, Sale, CommercialGoal, MonthlyPayment, FinancialRelease, RecurringBill, FinancialGoal, Creative } from '../types';
 
 export const storage = {
   // Payments
@@ -103,5 +103,18 @@ export const storage = {
 
   saveFinancialGoal: async (goal: FinancialGoal) => {
     await firebaseStorage.saveFinancialGoal(goal);
+  },
+
+  // CREATIVES
+  getCreatives: async (): Promise<Creative[]> => {
+    return await firebaseStorage.getCreatives();
+  },
+
+  saveCreative: async (creative: Creative) => {
+    await firebaseStorage.saveCreative(creative);
+  },
+
+  deleteCreative: async (id: string) => {
+    await firebaseStorage.deleteCreative(id);
   }
 };
