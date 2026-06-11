@@ -281,6 +281,7 @@ export interface Creative {
   script?: string; // Roteiro (large text)
   observations?: string; // Observações
   learnings?: string; // Aprendizados (large text)
+  videoUrl?: string; // Link para o vídeo gravado/editado (Google Drive, Youtube, etc)
   ownerId?: string;
 }
 

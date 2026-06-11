@@ -29,6 +29,21 @@ import { storage } from '../lib/storage';
 import { toast } from 'sonner';
 import { Creative, CreativeStatus } from '../types';
 
+function getGoogleDriveEmbedUrl(url?: string): string | null {
+  if (!url) return null;
+  // Match standard drive.google.com/file/d/ID/view or similar paths
+  const fileDMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileDMatch && fileDMatch[1]) {
+    return `https://drive.google.com/file/d/${fileDMatch[1]}/preview`;
+  }
+  // Match drive.google.com/open?id=ID
+  const openIdMatch = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+  if (openIdMatch && openIdMatch[1]) {
+    return `https://drive.google.com/file/d/${openIdMatch[1]}/preview`;
+  }
+  return null;
+}
+
 export function TrafficWorkspace() {
   const [creatives, setCreatives] = useState<Creative[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -60,6 +75,7 @@ export function TrafficWorkspace() {
   const [formScript, setFormScript] = useState<string>('');
   const [formObservations, setFormObservations] = useState<string>('');
   const [formLearnings, setFormLearnings] = useState<string>('');
+  const [formVideoUrl, setFormVideoUrl] = useState<string>('');
 
   // Dropdown constants
   const creativeTypes = [
@@ -212,6 +228,7 @@ export function TrafficWorkspace() {
     setFormScript('');
     setFormObservations('');
     setFormLearnings('');
+    setFormVideoUrl('');
     setSelectedCreative(null);
     setIsFormOpen(true);
   };
@@ -233,6 +250,7 @@ export function TrafficWorkspace() {
     setFormScript(creative.script || '');
     setFormObservations(creative.observations || '');
     setFormLearnings(creative.learnings || '');
+    setFormVideoUrl(creative.videoUrl || '');
     setSelectedCreative(creative);
     setIsFormOpen(true);
   };
@@ -260,6 +278,7 @@ export function TrafficWorkspace() {
       script: formScript.trim() || undefined,
       observations: formObservations.trim() || undefined,
       learnings: formLearnings.trim() || undefined,
+      videoUrl: formVideoUrl.trim() || undefined,
     };
 
     // Auto validation logic: if status is VALIDADO and validationDate is empty, fill with today
@@ -717,9 +736,15 @@ export function TrafficWorkspace() {
                       </td>
 
                       {/* Title */}
-                      <td className="py-4 px-4 text-xs font-medium text-white max-w-[280px] truncate">
-                        <div className="font-semibold text-white group-hover:text-accent-mint transition-colors truncate">
-                          {c.title}
+                      <td className="py-4 px-4 text-xs font-medium text-white max-w-[280px]">
+                        <div className="font-semibold text-white group-hover:text-accent-mint transition-colors truncate flex items-center gap-1.5">
+                          <span className="truncate">{c.title}</span>
+                          {c.videoUrl && (
+                            <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-accent-mint/10 border border-accent-mint/25 text-[9px] font-bold text-accent-mint tracking-wider" title="Vídeo Final anexado">
+                              <Video size={8} />
+                              MÍDIA
+                            </span>
+                          )}
                         </div>
                         {c.script && (
                           <div className="text-[10px] text-text-muted mt-1 truncate">
@@ -961,6 +986,51 @@ export function TrafficWorkspace() {
                   ) : (
                     <div className="p-6 bg-white/[0.01] border border-dashed border-white/10 rounded-2xl text-center text-xs text-text-muted">
                       Roteiro vazio. Roteiros estruturados ajudam a re-utilizar ganchos fortes!
+                    </div>
+                  )}
+                </div>
+
+                {/* Vídeo Gravado / Editado */}
+                <div className="space-y-2">
+                  <h4 className="text-xs uppercase tracking-widest font-bold text-text-muted flex items-center gap-1.5 border-b border-white/5 pb-1">
+                    <Video size={13} className="text-accent-mint" /> 
+                    Vídeo Final Gravado & Editado (Mídia do Laboratório)
+                  </h4>
+                  {selectedCreative.videoUrl ? (
+                    <div className="space-y-3">
+                      {getGoogleDriveEmbedUrl(selectedCreative.videoUrl) ? (
+                        <div className="relative w-full rounded-2xl overflow-hidden bg-black border border-white/10" style={{ aspectRatio: '16/9' }}>
+                          <iframe
+                            src={getGoogleDriveEmbedUrl(selectedCreative.videoUrl)!}
+                            width="100%"
+                            height="100%"
+                            allow="autoplay"
+                            allowFullScreen
+                            className="absolute inset-0 w-full h-full border-none"
+                            title="Player Google Drive"
+                          />
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-white/5 border border-white/10 rounded-2xl text-center flex flex-col items-center justify-center space-y-2">
+                          <p className="text-xs text-text-secondary">O link fornecido não suporta player incorporado direto, mas você pode abrir no navegador:</p>
+                          <p className="text-[10px] text-accent-neutral md:text-accent-mint font-mono max-w-xs truncate">{selectedCreative.videoUrl}</p>
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <a
+                          href={selectedCreative.videoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 flex items-center justify-center gap-2 p-2.5 bg-accent-mint text-black hover:bg-accent-mint/90 rounded-xl text-xs font-bold transition-all shadow-lg shadow-accent-mint/10"
+                        >
+                          <Video size={14} />
+                          Abrir Vídeo Original
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-6 bg-white/[0.01] border border-dashed border-white/10 rounded-2xl text-center text-xs text-text-muted">
+                      Vídeo pendente de gravação/edição. Adicione o link do Google Drive para assistir ou re-baixar o vídeo editado a qualquer momento.
                     </div>
                   )}
                 </div>
@@ -1235,6 +1305,24 @@ export function TrafficWorkspace() {
                       onChange={(e) => setFormLearnings(e.target.value)}
                       className="w-full bg-white/5 border border-white/10 hover:border-white/20 focus:border-accent-mint/50 rounded-xl p-4 text-xs text-white leading-relaxed outline-none transition-all placeholder:text-text-muted resize-y"
                     />
+                  </div>
+
+                  {/* Link do Vídeo Final Gravado / Editado */}
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest flex items-center gap-1.5">
+                      <Video size={12} className="text-accent-mint" />
+                      Vídeo Final Gravado / Editado (Google Drive / Nuvem)
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="Cole o link do Google Drive, Loom, YouTube ou outro armazenamento..."
+                      value={formVideoUrl}
+                      onChange={(e) => setFormVideoUrl(e.target.value)}
+                      className="w-full bg-[#050506] border border-white/10 hover:border-white/20 focus:border-accent-mint/50 rounded-xl px-4 py-3 text-xs text-white outline-none transition-all placeholder:text-text-muted font-mono"
+                    />
+                    <p className="text-[9px] text-text-muted leading-relaxed">
+                      Cole o link compartilhado. Se o link for do Google Drive, o painel de detalhes criará uma visualização e player integrados para você assistir diretamente da Omega!
+                    </p>
                   </div>
 
                   {/* Observações Supplemental */}
