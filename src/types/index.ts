@@ -264,7 +264,7 @@ export interface FinancialGoal {
   ownerId?: string;
 }
 
-export type CreativeStatus = 'IDEIA' | 'PRODUZIDO' | 'VALIDADO' | 'DESCARTADO';
+export type CreativeStatus = 'IDEIA' | 'PRODUZIDO' | 'EDITADO' | 'TESTE_CAMPANHA' | 'VALIDADO' | 'DESCARTADO';
 
 export interface Creative {
   id: string;

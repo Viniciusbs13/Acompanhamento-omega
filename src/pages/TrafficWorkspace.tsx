@@ -102,6 +102,8 @@ export function TrafficWorkspace() {
   const statusOptions: { value: CreativeStatus; label: string; color: string; bg: string; dot: string }[] = [
     { value: 'IDEIA', label: 'Ideia', color: 'text-accent-amber', bg: 'bg-accent-amber/10 border-accent-amber/20', dot: '🔴' }, // yellow dot
     { value: 'PRODUZIDO', label: 'Produzido', color: 'text-sky-400', bg: 'bg-sky-400/10 border-sky-400/20', dot: '🔵' }, // blue dot
+    { value: 'EDITADO', label: 'Editado', color: 'text-fuchsia-400', bg: 'bg-fuchsia-400/10 border-fuchsia-400/20', dot: '🟣' },
+    { value: 'TESTE_CAMPANHA', label: 'Teste Campanha', color: 'text-orange-400', bg: 'bg-orange-400/10 border-orange-400/20', dot: '🟠' },
     { value: 'VALIDADO', label: 'Validado', color: 'text-accent-mint', bg: 'bg-accent-mint/10 border-accent-mint/20', dot: '🟢' }, // green dot
     { value: 'DESCARTADO', label: 'Descartado', color: 'text-accent-coral', bg: 'bg-accent-coral/10 border-accent-coral/20', dot: '🟡' } // red dot
   ];
@@ -504,99 +506,6 @@ export function TrafficWorkspace() {
         </div>
       </div>
 
-      {/* SEÇÃO ESPECIAL - HALL DOS VENCEDORES (GOLD / CROWN THEMED) */}
-      <div className="glass p-6 md:p-8 rounded-3xl border border-accent-mint/20 relative overflow-hidden bg-gradient-to-r from-accent-mint/[0.02] via-transparent to-transparent">
-        {/* Decorative elements */}
-        <div className="absolute right-0 top-0 w-64 h-64 bg-accent-mint/5 blur-[120px] rounded-full pointer-events-none" />
-        <div className="absolute left-10 bottom-0 w-48 h-48 bg-accent-amber/5 blur-[80px] rounded-full pointer-events-none" />
-        
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-gradient-to-br from-accent-amber/20 to-accent-mint/10 rounded-2xl text-accent-amber border border-accent-amber/30 shadow-[0_0_20px_-5px_rgba(255,176,32,0.3)]">
-              <Crown size={24} className="animate-pulse" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                HALL DOS VENCEDORES <span className="text-xs text-accent-amber font-mono">Biblioteca de Elite</span>
-              </h2>
-              <p className="text-xs text-text-secondary leading-relaxed mt-0.5">
-                Exibição instantânea das campanhas e ganchos validados que superaram as metas. O patrimônio intelectual da Omega.
-              </p>
-            </div>
-          </div>
-          <span className="text-xs font-mono px-3 py-1.5 rounded-xl bg-white/5 border border-white/5 text-text-secondary shrink-0">
-            {hallOfWinners.length} Criativos de Elite
-          </span>
-        </div>
-
-        {hallOfWinners.length === 0 ? (
-          <div className="py-12 text-center text-text-muted text-sm space-y-2">
-            <Sparkles className="mx-auto text-text-muted opacity-4 a-pulse" size={32} />
-            <p>Selecione ou edite o status de um criativo para "Validado" para incluí-lo aqui.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {hallOfWinners.map(winner => (
-              <div 
-                key={winner.id}
-                onClick={() => handleOpenDetails(winner)}
-                className="glass hover:bg-white/[0.04] p-5 rounded-2xl border border-accent-amber/15 hover:border-accent-amber/30 cursor-pointer group flex flex-col justify-between transition-all duration-300 relative"
-              >
-                {/* Glow bar */}
-                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-accent-amber to-accent-mint opacity-40 rounded-t-full group-hover:opacity-100 transition-opacity" />
-                
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-accent-amber/10 border border-accent-amber/20 text-accent-amber">
-                      {winner.code}
-                    </span>
-                    <div className="flex gap-1 text-accent-amber">
-                      {Array.from({ length: winner.rating }).map((_, i) => (
-                        <Star key={i} size={11} fill="currentColor" />
-                      ))}
-                    </div>
-                  </div>
-
-                  <h3 className="font-semibold text-white group-hover:text-accent-amber text-sm leading-snug line-clamp-2 mb-2 text-left">
-                    {winner.title}
-                  </h3>
-
-                  <div className="grid grid-cols-2 gap-2 text-[11px] py-2 border-y border-white/5 mb-3 text-left">
-                    <div>
-                      <p className="text-text-muted font-normal">Tipo</p>
-                      <p className="font-medium text-white max-w-[120px] truncate">{winner.type}</p>
-                    </div>
-                    <div>
-                      <p className="text-text-muted font-normal">Objetivo</p>
-                      <p className="font-medium text-white max-w-[120px] truncate">{winner.objective}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-left">
-                  {winner.validationReason ? (
-                    <div className="bg-accent-mint/5 border border-accent-mint/10 rounded-xl p-2.5 space-y-1">
-                      <p className="text-[9px] uppercase font-bold text-accent-mint tracking-wider flex items-center gap-1 leading-none">
-                        <Sparkle size={10} /> Motivo da Validação
-                      </p>
-                      <p className="text-xs font-medium text-white leading-tight line-clamp-2">
-                        {winner.validationReason}
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-text-muted italic">Nenhum motivo registrado</p>
-                  )}
-                  <div className="flex items-center justify-between text-[10px] text-text-muted mt-3 font-mono pt-1">
-                    <span>Validação:</span>
-                    <span className="text-white font-medium">{formatDateString(winner.validationDate)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* BANCO DE CRIATIVOS - LIST, FILTERS, SEARCH */}
       <div className="glass rounded-3xl border border-white/5 overflow-hidden">
         {/* Header & Controls */}
@@ -635,6 +544,8 @@ export function TrafficWorkspace() {
                 <option value="ALL" className="bg-[#0A0A0B]">Qualquer um</option>
                 <option value="IDEIA" className="bg-[#0A0A0B]">🟡 Ideia</option>
                 <option value="PRODUZIDO" className="bg-[#0A0A0B]">🔵 Produzido</option>
+                <option value="EDITADO" className="bg-[#0A0A0B]">🟣 Editado</option>
+                <option value="TESTE_CAMPANHA" className="bg-[#0A0A0B]">🟠 Teste Campanha</option>
                 <option value="VALIDADO" className="bg-[#0A0A0B]">🟢 Validado</option>
                 <option value="DESCARTADO" className="bg-[#0A0A0B]">🔴 Descartado</option>
               </select>
@@ -763,6 +674,8 @@ export function TrafficWorkspace() {
                           >
                             <option value="IDEIA" className="bg-[#0A0A0B] text-accent-amber">🟡 Ideia</option>
                             <option value="PRODUZIDO" className="bg-[#0A0A0B] text-sky-400">🔵 Produzido</option>
+                            <option value="EDITADO" className="bg-[#0A0A0B] text-fuchsia-400">🟣 Editado</option>
+                            <option value="TESTE_CAMPANHA" className="bg-[#0A0A0B] text-orange-400">🟠 Teste Campanha</option>
                             <option value="VALIDADO" className="bg-[#0A0A0B] text-accent-mint font-bold">🟢 Validado</option>
                             <option value="DESCARTADO" className="bg-[#0A0A0B] text-accent-coral">🔴 Descartado</option>
                           </select>
@@ -916,6 +829,8 @@ export function TrafficWorkspace() {
                       >
                         <option value="IDEIA" className="bg-[#0A0A0B]">🟡 Ideia</option>
                         <option value="PRODUZIDO" className="bg-[#0A0A0B]">🔵 Produzido</option>
+                        <option value="EDITADO" className="bg-[#0A0A0B] text-fuchsia-400">🟣 Editado</option>
+                        <option value="TESTE_CAMPANHA" className="bg-[#0A0A0B] text-orange-400">🟠 Teste Campanha</option>
                         <option value="VALIDADO" className="bg-[#0A0A0B] text-accent-mint font-bold">🟢 Validado</option>
                         <option value="DESCARTADO" className="bg-[#0A0A0B]">🔴 Descartado</option>
                       </select>
@@ -1156,6 +1071,8 @@ export function TrafficWorkspace() {
                     >
                       <option value="IDEIA" className="bg-[#0A0A0B]">🟡 Ideia</option>
                       <option value="PRODUZIDO" className="bg-[#0A0A0B]">🔵 Produzido</option>
+                      <option value="EDITADO" className="bg-[#0A0A0B]">🟣 Editado</option>
+                      <option value="TESTE_CAMPANHA" className="bg-[#0A0A0B]">🟠 Teste Campanha</option>
                       <option value="VALIDADO" className="bg-[#0A0A0B]">🟢 Validado</option>
                       <option value="DESCARTADO" className="bg-[#0A0A0B]">🔴 Descartado</option>
                     </select>

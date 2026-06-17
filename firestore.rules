@@ -33,11 +33,11 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.auth.uid == userId && 
         incoming().keys().hasAll(['managerName', 'theme']) && 
         incoming().managerName is string && incoming().managerName.size() <= 100 &&
-        (!incoming().keys().contains('trafficPanelUrl') || (incoming().trafficPanelUrl is string && incoming().trafficPanelUrl.size() <= 1000));
+        (!('trafficPanelUrl' in incoming()) || (incoming().trafficPanelUrl is string && incoming().trafficPanelUrl.size() <= 1000));
       allow update: if isSignedIn() && request.auth.uid == userId && 
         incoming().diff(existing()).affectedKeys().hasOnly(['managerName', 'theme', 'trafficPanelUrl']) &&
         incoming().managerName is string &&
-        (!incoming().keys().contains('trafficPanelUrl') || (incoming().trafficPanelUrl is string && incoming().trafficPanelUrl.size() <= 1000));
+        (!('trafficPanelUrl' in incoming()) || (incoming().trafficPanelUrl is string && incoming().trafficPanelUrl.size() <= 1000));
     }
 
     // Clients
@@ -141,10 +141,10 @@ service cloud.firestore {
       function isValidRelease(data) {
         return data.date is string && data.date.size() <= 64 &&
                data.description is string && data.description.size() <= 300 &&
-               data.category in ['Tráfego Pago', 'Freelancer', 'Ferramentas', 'Software', 'Assinaturas', 'Equipamentos', 'Marketing', 'Combustível', 'Alimentação', 'Escritório', 'Impostos', 'Outros'] &&
+               data.category is string && data.category.size() <= 100 &&
                data.type in ['RECEITA', 'GASTO', 'INVESTIMENTO'] &&
                (data.value is int || data.value is float) &&
-               (!data.keys().contains('observation') || (data.observation is string && data.observation.size() <= 1000)) &&
+               (!('observation' in data) || (data.observation is string && data.observation.size() <= 1000)) &&
                data.ownerId == request.auth.uid;
       }
 
@@ -195,11 +195,11 @@ service cloud.firestore {
       function isValidCreative(data) {
         return data.code is string &&
                data.title is string && data.title.size() <= 200 &&
-               data.status in ['IDEIA', 'PRODUZIDO', 'VALIDADO', 'DESCARTADO'] &&
+               data.status in ['IDEIA', 'PRODUZIDO', 'EDITADO', 'TESTE_CAMPANHA', 'VALIDADO', 'DESCARTADO'] &&
                data.type is string &&
                data.objective is string &&
                data.creationDate is string &&
-               data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+               (data.rating is int || data.rating is float) && data.rating >= 1 && data.rating <= 5 &&
                data.ownerId == request.auth.uid;
       }
 
