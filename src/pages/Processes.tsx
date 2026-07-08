@@ -672,18 +672,74 @@ export function Processes() {
   };
 
   const handleDeleteColumn = async (col: ProcessColumn) => {
-    const columnTasksCount = tasks.filter(t => t.columnId === col.id).length;
+    const colTasks = tasks.filter(t => t.columnId === col.id);
+    const columnTasksCount = colTasks.length;
+
     if (columnTasksCount > 0) {
-      toast.error(`Não é possível excluir esta coluna porque ela contém ${columnTasksCount} tarefas. Mova os cards primeiro.`);
-      return;
+      if (!window.confirm(`⚠️ AVISO IMPORTANTE: A coluna "${col.name}" contém ${columnTasksCount} card(s)/tarefa(s).\n\nAo excluir esta coluna, TODOS esses cards serão excluídos permanentemente do sistema!\n\nDeseja realmente excluir a coluna "${col.name}" e todas as suas tarefas?`)) {
+        return;
+      }
+    } else {
+      if (!window.confirm(`Deseja realmente excluir a coluna "${col.name}" permanentemente?`)) return;
     }
-    if (!window.confirm(`Excluir a coluna "${col.name}" permanentemente?`)) return;
 
     try {
+      if (columnTasksCount > 0) {
+        for (const task of colTasks) {
+          await storage.deleteTask(task.id);
+        }
+      }
       await storage.deleteColumn(col.id);
-      toast.success('Coluna removida.');
+      toast.success('Coluna e tarefas removidas com sucesso.');
     } catch (err) {
       toast.error('Erro ao remover coluna.');
+    }
+  };
+
+  const handleDeleteProcess = async (proc: Processo) => {
+    // Get all columns and tasks for this process
+    const procCols = columns.filter(c => c.processoId === proc.id);
+    const procTasks = tasks.filter(t => t.processoId === proc.id);
+    
+    const taskCount = procTasks.length;
+    const colCount = procCols.length;
+
+    let confirmMsg = `Deseja realmente excluir permanentemente o Processo "${proc.name}"?`;
+    if (taskCount > 0 || colCount > 0) {
+      confirmMsg = `⚠️ AVISO CRÍTICO: O processo "${proc.name}" possui ${colCount} colunas e ${taskCount} card(s)/tarefa(s).\n\nAo excluir este processo, TODAS as colunas e todos os cards associados a ele serão excluídos permanentemente do sistema!\n\nVocê tem certeza absoluta de que deseja excluir o processo "${proc.name}" e tudo que há nele?`;
+    }
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const toastId = toast.loading(`Excluindo o processo "${proc.name}"...`);
+      
+      // Delete tasks
+      for (const t of procTasks) {
+        await storage.deleteTask(t.id);
+      }
+      
+      // Delete columns
+      for (const c of procCols) {
+        await storage.deleteColumn(c.id);
+      }
+      
+      // Delete process
+      await storage.deleteProcess(proc.id);
+      
+      // If we deleted the active process, switch to another one
+      if (activeProcessId === proc.id) {
+        const remaining = processes.filter(p => p.id !== proc.id);
+        if (remaining.length > 0) {
+          setActiveProcessId(remaining[0].id);
+        } else {
+          setActiveProcessId('');
+        }
+      }
+      
+      toast.success(`Processo "${proc.name}" excluído com sucesso.`, { id: toastId });
+    } catch (err) {
+      toast.error('Erro ao excluir processo.');
     }
   };
 
@@ -896,24 +952,38 @@ export function Processes() {
           {processes.map(p => {
             const isActive = p.id === activeProcessId;
             return (
-              <button
+              <div
                 key={p.id}
-                onClick={() => setActiveProcessId(p.id)}
-                className={`px-4.5 py-3 rounded-2xl border text-xs font-bold transition-all flex items-center gap-2.5 shrink-0 cursor-pointer ${
-                  isActive
-                    ? 'bg-white/10 text-white shadow-xl'
-                    : 'bg-white/5 text-text-secondary border-transparent hover:bg-white/8 hover:text-white'
-                }`}
-                style={{
-                  borderColor: isActive ? p.color : 'transparent'
-                }}
+                className="group relative flex items-center shrink-0"
               >
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
-                <span>{p.name}</span>
-                {isActive && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-text-secondary font-mono"> Ativo </span>
-                )}
-              </button>
+                <button
+                  onClick={() => setActiveProcessId(p.id)}
+                  className={`pl-4.5 ${isActive ? 'pr-9' : 'pr-8'} py-3 rounded-2xl border text-xs font-bold transition-all flex items-center gap-2.5 cursor-pointer ${
+                    isActive
+                      ? 'bg-white/10 text-white shadow-xl'
+                      : 'bg-white/5 text-text-secondary border-transparent hover:bg-white/8 hover:text-white'
+                  }`}
+                  style={{
+                    borderColor: isActive ? p.color : 'transparent'
+                  }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                  <span>{p.name}</span>
+                  {isActive && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-text-secondary font-mono"> Ativo </span>
+                  )}
+                </button>
+                <button
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    await handleDeleteProcess(p);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-text-muted hover:text-accent-coral hover:bg-white/5 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer"
+                  title="Excluir Processo"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
             );
           })}
           {processes.length === 0 && (
