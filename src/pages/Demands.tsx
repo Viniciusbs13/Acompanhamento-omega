@@ -242,6 +242,19 @@ export function Demands() {
     }
   };
 
+  const handleDeleteCreative = async (creative: Creative) => {
+    if (!window.confirm(`Deseja realmente excluir o criativo/vídeo "${creative.title || creative.code}"?`)) {
+      return;
+    }
+    const toastId = toast.loading('Excluindo criativo...');
+    try {
+      await storage.deleteCreative(creative.id);
+      toast.success('Criativo excluído com sucesso!', { id: toastId });
+    } catch (err) {
+      toast.error('Erro ao excluir criativo.', { id: toastId });
+    }
+  };
+
   const allDemands = useMemo(() => {
     const demands: DemandItem[] = [];
     const todayActual = startOfDay(new Date());
@@ -616,7 +629,13 @@ export function Demands() {
               : (item.isRecurring || (item.recurringDays && item.recurringDays.length > 0) || (client.billingModel === 'RECURRING' && !item.recurringDays));
             
             if (isRecurring) {
-              item.deletedDates = [...(item.deletedDates || []), dateStr];
+              const deleteAll = window.confirm("Esta é uma demanda recorrente.\n\nDeseja excluir TODA A SÉRIE? (Clique em OK para excluir toda a série, ou em Cancelar para excluir apenas esta ocorrência específica)");
+              if (deleteAll) {
+                updatedClient.contentPlan.items = updatedClient.contentPlan.items.filter(i => i.id !== item.id);
+                updatedClient.contentPlan.total = updatedClient.contentPlan.items.length;
+              } else {
+                item.deletedDates = [...(item.deletedDates || []), dateStr];
+              }
             } else {
               updatedClient.contentPlan.items = updatedClient.contentPlan.items.filter(i => i.id !== item.id);
               updatedClient.contentPlan.total = updatedClient.contentPlan.items.length;
@@ -630,7 +649,12 @@ export function Demands() {
             const item = updatedClient.captures[itemIndex];
             const isRecurring = item.recurrenceType && item.recurrenceType !== 'NONE';
             if (isRecurring) {
-              item.deletedDates = [...(item.deletedDates || []), dateStr];
+              const deleteAll = window.confirm("Esta é uma gravação/captação recorrente.\n\nDeseja excluir TODA A SÉRIE? (Clique em OK para excluir toda a série, ou em Cancelar para excluir apenas esta ocorrência específica)");
+              if (deleteAll) {
+                updatedClient.captures = updatedClient.captures.filter(i => i.id !== item.id);
+              } else {
+                item.deletedDates = [...(item.deletedDates || []), dateStr];
+              }
             } else {
               updatedClient.captures = updatedClient.captures.filter(i => i.id !== demand.id);
             }
@@ -643,7 +667,12 @@ export function Demands() {
             const item = updatedClient.meetings[itemIndex];
             const isRecurring = item.recurrenceType && item.recurrenceType !== 'NONE';
             if (isRecurring) {
-              item.deletedDates = [...(item.deletedDates || []), dateStr];
+              const deleteAll = window.confirm("Esta é uma reunião recorrente.\n\nDeseja excluir TODA A SÉRIE? (Clique em OK para excluir toda a série, ou em Cancelar para excluir apenas esta ocorrência específica)");
+              if (deleteAll) {
+                updatedClient.meetings = updatedClient.meetings.filter(i => i.id !== item.id);
+              } else {
+                item.deletedDates = [...(item.deletedDates || []), dateStr];
+              }
             } else {
               updatedClient.meetings = updatedClient.meetings.filter(i => i.id !== demand.id);
             }
@@ -1017,10 +1046,17 @@ export function Demands() {
                             <span className="text-[9px] text-text-muted font-mono">Sem Cliente</span>
                           )}
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             <span className="text-[9px] text-text-muted bg-white/5 px-1.5 py-0.5 rounded font-mono">
                               {creative.type}
                             </span>
+                            <button
+                              onClick={() => handleDeleteCreative(creative)}
+                              className="p-1 hover:bg-accent-coral/20 text-text-muted hover:text-accent-coral rounded-lg transition-all cursor-pointer"
+                              title="Excluir Criativo"
+                            >
+                              <Trash2 size={11} />
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1109,7 +1145,7 @@ function MonthCalendar({ currentDate, demands, onUpdateStatus, onDelete }: { cur
                 <div 
                   key={demand.id}
                   className={cn(
-                    "w-full text-left px-1.5 py-1 rounded text-[9px] font-medium flex items-center gap-1.5 group/item transition-all relative",
+                    "w-full text-left pl-1.5 pr-6 py-1 rounded text-[9px] font-medium flex items-center gap-1.5 group/item transition-all relative",
                     demand.status === 'CONCLUIDO' ? "bg-accent-mint/10 text-accent-mint/80 line-through" : "bg-white/5 text-white hover:bg-white/10",
                     demand.status === 'ATRASADO' && !demand.status.includes('CONCLUIDO') && "border-l-2 border-accent-coral"
                   )}
@@ -1128,7 +1164,7 @@ function MonthCalendar({ currentDate, demands, onUpdateStatus, onDelete }: { cur
                       e.stopPropagation();
                       onDelete(demand);
                     }}
-                    className="opacity-0 group-hover/item:opacity-100 p-0.5 hover:bg-white/20 rounded transition-all text-text-muted hover:text-accent-coral shrink-0 absolute right-1 bg-inherit"
+                    className="opacity-30 group-hover/item:opacity-100 hover:opacity-100 p-0.5 hover:bg-white/20 rounded transition-all text-text-muted hover:text-accent-coral shrink-0 absolute right-1 bg-inherit cursor-pointer"
                     title="Excluir Demanda"
                   >
                     <Trash2 size={10} />
@@ -1216,7 +1252,7 @@ function WeekCalendar({ currentDate, demands, onUpdateStatus, onDelete }: { curr
                       e.stopPropagation();
                       onDelete(demand);
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded-lg transition-all text-text-muted hover:text-accent-coral absolute top-2 right-2"
+                    className="opacity-30 group-hover:opacity-100 hover:opacity-100 p-1 hover:bg-white/10 rounded-lg transition-all text-text-muted hover:text-accent-coral absolute top-2 right-2 cursor-pointer"
                     title="Excluir Demanda"
                   >
                     <Trash2 size={12} />

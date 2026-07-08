@@ -14,6 +14,7 @@ import { storage } from '../lib/storage';
 import { calculateMetrics, getHealthStatus, generateInsights } from '../lib/calculations';
 import { cn, formatCurrency, formatPercent, formatNumber } from '../lib/utils';
 import { useVisibility } from '../contexts/VisibilityContext';
+import { Creative } from '../types';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, BarChart, Bar, Cell
@@ -187,6 +188,7 @@ export function ClientDashboard() {
   const [client, setClient] = useState<any>(null);
   const [loadingClient, setLoadingClient] = useState(true);
   const [clientTasks, setClientTasks] = useState<any[]>([]);
+  const [clientCreatives, setClientCreatives] = useState<Creative[]>([]);
   const [processesList, setProcessesList] = useState<any[]>([]);
   const [columnsList, setColumnsList] = useState<any[]>([]);
   
@@ -209,9 +211,16 @@ export function ClientDashboard() {
         setClientTasks(filtered);
       });
 
+      // Listen to creatives and filter by client
+      const unsubCreatives = storage.listenToCreatives((list) => {
+        const filtered = list.filter(c => c.clientId === id);
+        setClientCreatives(filtered);
+      });
+
       return () => {
         unsubProcesses();
         unsubTasks();
+        unsubCreatives();
       };
     }
   }, [id]);
@@ -232,6 +241,19 @@ export function ClientDashboard() {
       });
     } else {
       document.exitFullscreen();
+    }
+  };
+
+  const handleDeleteCreative = async (creative: Creative) => {
+    if (!window.confirm(`Deseja realmente excluir o criativo/vídeo "${creative.title || creative.code}"?`)) {
+      return;
+    }
+    const toastId = toast.loading('Excluindo criativo...');
+    try {
+      await storage.deleteCreative(creative.id);
+      toast.success('Criativo excluído com sucesso!', { id: toastId });
+    } catch (err) {
+      toast.error('Erro ao excluir criativo.', { id: toastId });
     }
   };
   const { entries, addEntry, removeEntry, loading: loadingEntries } = useEntries(id || '');
@@ -1404,6 +1426,82 @@ export function ClientDashboard() {
                 })}
               </div>
             )}
+
+            {/* Criativos / Vídeos Grid */}
+            <div className="pt-6 border-t border-white/5 space-y-4">
+              <div>
+                <h4 className="font-bold text-lg text-white flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-mint" />
+                  Vídeos e Criativos Vinculados ({clientCreatives.length})
+                </h4>
+                <p className="text-xs text-text-muted">Lista de todos os criativos, ideias e vídeos de tráfego criados para este cliente.</p>
+              </div>
+
+              {clientCreatives.length === 0 ? (
+                <div className="glass rounded-3xl p-12 text-center text-text-muted space-y-2 border border-white/5">
+                  <Play className="mx-auto opacity-35" size={28} />
+                  <p className="text-xs">Nenhum criativo ou vídeo cadastrado.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {clientCreatives.map((creative) => (
+                    <div
+                      key={creative.id}
+                      className="p-4 rounded-2xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] transition-all flex flex-col justify-between gap-3 group relative"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="text-[10px] font-mono text-text-muted font-bold">
+                            {creative.code}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {creative.isUrgent && (
+                              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-accent-coral/20 text-accent-coral border border-accent-coral/30 shadow-[0_0_8px_rgba(255,90,95,0.1)]">
+                                URGENTE
+                              </span>
+                            )}
+                            <span className="px-1.5 py-0.5 bg-white/5 rounded text-[9px] font-mono text-text-secondary">
+                              {creative.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        <h5 className="text-xs font-semibold text-white line-clamp-1">{creative.title}</h5>
+                        {creative.type && (
+                          <span className="inline-block mt-1.5 text-[9px] text-text-muted bg-white/5 px-1.5 py-0.5 rounded font-mono">
+                            {creative.type}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/[0.04] mt-2">
+                        {creative.videoUrl ? (
+                          <a
+                            href={creative.videoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-accent-mint hover:underline flex items-center gap-1 font-semibold"
+                          >
+                            <ExternalLink size={10} />
+                            Ver Vídeo/Link
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-text-muted italic">Sem link de vídeo</span>
+                        )}
+
+                        <button
+                          onClick={() => handleDeleteCreative(creative)}
+                          className="p-1 hover:bg-accent-coral/20 text-text-muted hover:text-accent-coral rounded-lg transition-all cursor-pointer"
+                          title="Excluir Criativo/Vídeo"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </motion.div>
         )}
 
@@ -2256,6 +2354,65 @@ function DashboardCalendar({
     toast.success(selectedEvent ? "Evento atualizado!" : "Evento adicionado!");
   };
 
+  const handleDeleteEventFromGrid = async (event: any, date: Date) => {
+    const isRecurring = event.recurrenceType 
+                       ? event.recurrenceType !== 'NONE'
+                       : (event.isRecurring || (event.recurringDays && event.recurringDays.length > 0) || (event.type === 'content' && client.billingModel === 'RECURRING'));
+
+    let onlyThisOccurrence = false;
+    if (isRecurring) {
+      const confirmMsg = "Esta é uma demanda recorrente.\n\nDeseja excluir TODA A SÉRIE? (Clique em OK para excluir toda a série, ou em Cancelar para excluir apenas esta ocorrência específica)";
+      const deleteAll = window.confirm(confirmMsg);
+      onlyThisOccurrence = !deleteAll;
+    } else {
+      if (!window.confirm(`Deseja realmente excluir a demanda "${event.title || (event.type === 'content' ? 'Vídeo' : (event.type === 'capture' ? 'Captação' : 'Reunião'))}"?`)) return;
+    }
+
+    let updatedClient = { ...client };
+    const dateStr = date.toISOString().split('T')[0] || '';
+
+    if (onlyThisOccurrence && isRecurring) {
+      if (event.type === 'content') {
+        const items = (updatedClient.contentPlan?.items || []).map((i: any) => {
+          if (i.id !== event.id) return i;
+          const deletedDates = i.deletedDates || [];
+          return { ...i, deletedDates: [...deletedDates, dateStr] };
+        });
+        updatedClient = { ...updatedClient, contentPlan: { ...(updatedClient.contentPlan || { total: 0 }), items } };
+      } else if (event.type === 'capture') {
+        const captures = (updatedClient.captures || []).map((i: any) => {
+          if (i.id !== event.id) return i;
+          const deletedDates = i.deletedDates || [];
+          return { ...i, deletedDates: [...deletedDates, dateStr] };
+        });
+        updatedClient = { ...updatedClient, captures };
+      } else if (event.type === 'meeting') {
+        const meetings = (updatedClient.meetings || []).map((i: any) => {
+          if (i.id !== event.id) return i;
+          const deletedDates = i.deletedDates || [];
+          return { ...i, deletedDates: [...deletedDates, dateStr] };
+        });
+        updatedClient = { ...updatedClient, meetings };
+      }
+    } else {
+      // Delete whole series
+      if (event.type === 'content') {
+        const items = updatedClient.contentPlan.items.filter((i: any) => i.id !== event.id);
+        updatedClient = { ...updatedClient, contentPlan: { ...updatedClient.contentPlan, items } };
+      } else if (event.type === 'capture') {
+        const captures = updatedClient.captures.filter((i: any) => i.id !== event.id);
+        updatedClient = { ...updatedClient, captures };
+      } else if (event.type === 'meeting') {
+        const meetings = updatedClient.meetings.filter((i: any) => i.id !== event.id);
+        updatedClient = { ...updatedClient, meetings };
+      }
+    }
+
+    setClient(updatedClient);
+    await storage.saveClient(updatedClient);
+    toast.success("Evento removido com sucesso!");
+  };
+
   const handleDeleteEvent = async (onlyThisOccurrence: boolean = false) => {
     if (!selectedEvent) return;
     
@@ -2387,12 +2544,10 @@ function DashboardCalendar({
                     : (event.status === 'POSTED' || event.status === 'DONE');
 
                   return (
-                    <button
+                    <div
                       key={`${event.id}-${dateStr}`}
-                      onClick={(e) => handleEventClick(e, event, dateObj.date)}
-                      onDoubleClick={(e) => handleEventDoubleClick(e, event, dateObj.date)}
                       className={cn(
-                        "w-full text-[8px] font-bold p-1 rounded-md border flex items-center gap-1 truncate text-left transition-all",
+                        "w-full text-[8px] font-bold p-1 rounded-md border flex items-center gap-1 justify-between transition-all group/event relative pr-4",
                         delayed && "border-accent-coral shadow-[0_0_10px_rgba(255,77,77,0.2)]",
                         event.type === 'content' 
                           ? (isCompleted ? "bg-accent-mint/20 border-accent-mint/30 text-accent-mint" : (delayed ? "bg-accent-coral/10 text-accent-coral" : "bg-accent-mint/10 border-accent-mint/10 text-white/40"))
@@ -2402,12 +2557,30 @@ function DashboardCalendar({
                             )
                       )}
                     >
-                      {event.type === 'content' ? <Play size={10} /> : (event.type === 'capture' ? <Camera size={10} /> : <MessageSquare size={10} />)}
-                      <span className="flex-1 truncate">{event.title || (event.type === 'content' ? 'Vídeo' : (event.type === 'capture' ? 'Captação' : 'Reunião'))}</span>
-                      {((event.type === 'content' && client.billingModel === 'RECURRING') || event.isRecurring) && (
-                        <Clock size={8} className="opacity-60" />
-                      )}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleEventClick(e, event, dateObj.date)}
+                        onDoubleClick={(e) => handleEventDoubleClick(e, event, dateObj.date)}
+                        className="flex-1 min-w-0 flex items-center gap-1 text-left"
+                      >
+                        {event.type === 'content' ? <Play size={10} className="shrink-0" /> : (event.type === 'capture' ? <Camera size={10} className="shrink-0" /> : <MessageSquare size={10} className="shrink-0" />)}
+                        <span className="flex-1 truncate">{event.title || (event.type === 'content' ? 'Vídeo' : (event.type === 'capture' ? 'Captação' : 'Reunião'))}</span>
+                        {((event.type === 'content' && client.billingModel === 'RECURRING') || event.isRecurring) && (
+                          <Clock size={8} className="opacity-60 shrink-0" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteEventFromGrid(event, dateObj.date);
+                        }}
+                        className="absolute right-0.5 top-1/2 -translate-y-1/2 opacity-30 group-hover/event:opacity-100 hover:opacity-100 hover:text-accent-coral p-0.5 rounded transition-all shrink-0 cursor-pointer"
+                        title="Excluir Evento"
+                      >
+                        <Trash2 size={9} />
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -2444,7 +2617,7 @@ function DashboardCalendar({
                    </button>
                 </div>
 
-                <form onSubmit={(e) => {
+                <form key={selectedEvent?.id || 'new'} onSubmit={(e) => {
                   e.preventDefault();
                   handleSaveEvent(new FormData(e.currentTarget));
                 }} className="space-y-6">
@@ -2491,6 +2664,120 @@ function DashboardCalendar({
                    </div>
 
                    <div className="space-y-4">
+                      {/* Lembretes e Controles de Recorrência */}
+                      {selectedEvent && (selectedEvent.recurrenceType ? selectedEvent.recurrenceType !== 'NONE' : (selectedEvent.isRecurring || selectedEvent.recurringDays?.length > 0 || (selectedEvent.type === 'content' && client.billingModel === 'RECURRING'))) && (
+                        <div className="p-4 rounded-2xl border border-white/5 bg-white/[0.02] space-y-3">
+                          <div className="flex items-start gap-2.5">
+                            <Clock size={16} className="text-accent-mint shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-xs font-bold text-white uppercase tracking-wider">Demanda Recorrente (Lembrete)</p>
+                              <p className="text-[11px] text-text-muted mt-1 leading-relaxed">
+                                Esta demanda é um lembrete que repete-se automaticamente. Para adicionar as informações específicas de criativo para este dia sem afetar as demais repetições, desvincule esta data.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-white/5">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const dateStr = selectedDay?.toISOString().split('T')[0] || '';
+                                let updatedClient = { ...client };
+                                const newId = Math.random().toString(36).substring(7);
+                                const singleEventData = {
+                                  id: newId,
+                                  title: selectedEvent.title || '',
+                                  notes: selectedEvent.notes || '',
+                                  recurrenceType: 'NONE',
+                                  recurringDays: [],
+                                  ordinalWeekday: null,
+                                  isRecurring: false,
+                                  status: selectedEvent.status || 'PLANNED',
+                                };
+
+                                if (selectedEvent.type === 'content') {
+                                  const items = (updatedClient.contentPlan?.items || []).map((i: any) => {
+                                    if (i.id !== selectedEvent.id) return i;
+                                    const deletedDates = i.deletedDates || [];
+                                    return { ...i, deletedDates: [...deletedDates, dateStr] };
+                                  });
+                                  const newItems = [...items, { ...singleEventData, targetDate: dateStr }];
+                                  updatedClient = { ...updatedClient, contentPlan: { ...(updatedClient.contentPlan || { total: 0 }), items: newItems } };
+                                } else if (selectedEvent.type === 'capture') {
+                                  const captures = (updatedClient.captures || []).map((i: any) => {
+                                    if (i.id !== selectedEvent.id) return i;
+                                    const deletedDates = i.deletedDates || [];
+                                    return { ...i, deletedDates: [...deletedDates, dateStr] };
+                                  });
+                                  const newCaptures = [...captures, { ...singleEventData, date: dateStr }];
+                                  updatedClient = { ...updatedClient, captures: newCaptures };
+                                } else if (selectedEvent.type === 'meeting') {
+                                  const meetings = (updatedClient.meetings || []).map((i: any) => {
+                                    if (i.id !== selectedEvent.id) return i;
+                                    const deletedDates = i.deletedDates || [];
+                                    return { ...i, deletedDates: [...deletedDates, dateStr] };
+                                  });
+                                  const newMeetings = [...meetings, { ...singleEventData, date: dateStr }];
+                                  updatedClient = { ...updatedClient, meetings: newMeetings };
+                                }
+
+                                setClient(updatedClient);
+                                await storage.saveClient(updatedClient);
+                                setSelectedEvent({
+                                  ...singleEventData,
+                                  type: selectedEvent.type
+                                });
+                                toast.success("Desvinculado! Agora você pode preencher os dados deste criativo de forma independente.");
+                              }}
+                              className="flex-1 px-3 py-2 bg-accent-mint hover:bg-accent-mint/90 text-black font-bold text-[9px] rounded-xl uppercase tracking-wider transition-all cursor-pointer text-center"
+                            >
+                              📝 Preencher dados hoje (Tornar Único)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!window.confirm("Deseja realmente cancelar a repetição desta demanda? (Ela deixará de se repetir e passará a ser uma demanda única)")) return;
+                                
+                                let updatedClient = { ...client };
+                                const stopRecurrenceData = {
+                                  recurrenceType: 'NONE',
+                                  recurringDays: [],
+                                  ordinalWeekday: null,
+                                  isRecurring: false
+                                };
+
+                                if (selectedEvent.type === 'content') {
+                                  const items = (updatedClient.contentPlan?.items || []).map((i: any) => 
+                                    i.id === selectedEvent.id ? { ...i, ...stopRecurrenceData } : i
+                                  );
+                                  updatedClient = { ...updatedClient, contentPlan: { ...(updatedClient.contentPlan || { total: 0 }), items } };
+                                } else if (selectedEvent.type === 'capture') {
+                                  const captures = (updatedClient.captures || []).map((i: any) => 
+                                    i.id === selectedEvent.id ? { ...i, ...stopRecurrenceData } : i
+                                  );
+                                  updatedClient = { ...updatedClient, captures };
+                                } else if (selectedEvent.type === 'meeting') {
+                                  const meetings = (updatedClient.meetings || []).map((i: any) => 
+                                    i.id === selectedEvent.id ? { ...i, ...stopRecurrenceData } : i
+                                  );
+                                  updatedClient = { ...updatedClient, meetings };
+                                }
+
+                                setClient(updatedClient);
+                                await storage.saveClient(updatedClient);
+                                setRecurrenceType('NONE');
+                                setSelectedEvent({
+                                  ...selectedEvent,
+                                  ...stopRecurrenceData
+                                });
+                                toast.success("A repetição foi desativada! Esta se tornou uma demanda única.");
+                              }}
+                              className="flex-1 px-3 py-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold text-[9px] rounded-xl uppercase tracking-wider transition-all cursor-pointer text-center"
+                            >
+                              ❌ Parar de repetir
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-[10px] font-bold uppercase tracking-widest text-text-muted mb-2">Tipo de Recorrência</label>
