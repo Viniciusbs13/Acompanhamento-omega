@@ -6,7 +6,8 @@ import jsPDF from 'jspdf';
 import { 
   TrendingUp, TrendingDown, Clock, Plus, FileText, 
   BarChart3, Settings, Share2, Maximize2, Download,
-  ArrowRight, Users, CreditCard, DollarSign, Target, PlusCircle, Trash2, Edit2, ChevronDown, CheckCircle2, AlertCircle, Info, Minimize2, ExternalLink, Camera, CalendarDays, Play, X, MessageSquare, Key, Lock, Copy, Eye, EyeOff
+  ArrowRight, Users, CreditCard, DollarSign, Target, PlusCircle, Trash2, Edit2, ChevronDown, CheckCircle2, AlertCircle, Info, Minimize2, ExternalLink, Camera, CalendarDays, Play, X, MessageSquare, Key, Lock, Copy, Eye, EyeOff,
+  Layers, CheckSquare, User
 } from 'lucide-react';
 import { useEntries } from '../hooks/useMetrics';
 import { storage } from '../lib/storage';
@@ -177,7 +178,7 @@ export function ClientDashboard() {
   const { id } = useParams<{ id: string }>();
   const { isVisible } = useVisibility();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview' | 'calendar' | 'entries' | 'report' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'calendar' | 'entries' | 'report' | 'settings' | 'processos'>('overview');
   const [isPresenting, setIsPresenting] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'monthly'>('all');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -185,6 +186,9 @@ export function ClientDashboard() {
   
   const [client, setClient] = useState<any>(null);
   const [loadingClient, setLoadingClient] = useState(true);
+  const [clientTasks, setClientTasks] = useState<any[]>([]);
+  const [processesList, setProcessesList] = useState<any[]>([]);
+  const [columnsList, setColumnsList] = useState<any[]>([]);
   
   useEffect(() => {
     if (id) {
@@ -193,6 +197,22 @@ export function ClientDashboard() {
         setClient(found);
         setLoadingClient(false);
       });
+
+      // Listen to processes and columns for detail references
+      const unsubProcesses = storage.listenToProcesses((list) => {
+        setProcessesList(list);
+      });
+
+      // Listen to all tasks and filter by client
+      const unsubTasks = storage.listenToAllTasks((list) => {
+        const filtered = list.filter(t => t.clientId === id);
+        setClientTasks(filtered);
+      });
+
+      return () => {
+        unsubProcesses();
+        unsubTasks();
+      };
     }
   }, [id]);
   
@@ -478,6 +498,7 @@ export function ClientDashboard() {
   const tabs = [
     { id: 'overview', label: 'Dashboard', icon: BarChart3 },
     { id: 'calendar', label: 'Calendário', icon: CalendarDays },
+    { id: 'processos', label: 'Processos Kanban', icon: Layers },
     { id: 'entries', label: 'Lançamentos', icon: PlusCircle },
     { id: 'report', label: 'Relatório', icon: FileText },
     { id: 'settings', label: 'Configurações', icon: Settings },
@@ -1261,6 +1282,128 @@ export function ClientDashboard() {
                 </div>
               </div>
             </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'processos' && (
+          <motion.div
+            key="processos"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-6 text-left"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-xl text-white">Demandas e Processos Kanban</h3>
+                <p className="text-xs text-text-secondary mt-1">Acompanhamento operacional de todas as etapas e criativos deste cliente.</p>
+              </div>
+              <button
+                onClick={() => navigate('/processos')}
+                className="px-4 py-2 bg-accent-mint/15 text-accent-mint border border-accent-mint/30 rounded-xl font-bold text-xs hover:bg-accent-mint/25 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                Ir para o Painel Kanban Completo
+                <ArrowRight size={14} />
+              </button>
+            </div>
+
+            {/* Tasks Bento Grid */}
+            {clientTasks.length === 0 ? (
+              <div className="glass rounded-3xl p-16 text-center space-y-4 border border-white/5">
+                <Layers className="mx-auto text-text-muted" size={40} />
+                <h4 className="text-base font-semibold text-white">Nenhuma atividade operacional vinculada</h4>
+                <p className="text-text-muted text-xs max-w-sm mx-auto leading-relaxed">
+                  Não existem cards criativos ou tarefas ativas para este cliente em nenhum fluxo de trabalho (Produção de Vídeo, Comercial, Design, etc.).
+                </p>
+                <button
+                  onClick={() => navigate('/processos')}
+                  className="px-4.5 py-2 bg-white/5 border border-white/10 text-white rounded-xl text-xs font-bold hover:bg-white/10 transition-all cursor-pointer"
+                >
+                  Adicionar primeira tarefa
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {clientTasks.map(task => {
+                  const processObj = processesList.find(p => p.id === task.processoId);
+                  
+                  // Checklist completion percentage helper
+                  const totalCheck = task.checklist?.length || 0;
+                  const doneCheck = task.checklist?.filter((c: any) => c.completed).length || 0;
+                  const percent = totalCheck > 0 ? Math.round((doneCheck / totalCheck) * 100) : 0;
+
+                  return (
+                    <div 
+                      key={task.id}
+                      className="glass rounded-2xl p-5 border border-white/[0.06] hover:border-white/15 bg-white/[0.01] hover:bg-white/[0.03] transition-all flex flex-col justify-between gap-4"
+                    >
+                      <div className="space-y-2">
+                        {/* Process and Status tags */}
+                        <div className="flex items-center justify-between gap-2">
+                          <span 
+                            className="px-2.5 py-0.5 rounded-lg text-[9px] font-bold uppercase tracking-wider border"
+                            style={{ 
+                              color: processObj?.color || '#fff', 
+                              borderColor: processObj?.color ? `${processObj.color}30` : 'rgba(255,255,255,0.1)',
+                              backgroundColor: processObj?.color ? `${processObj.color}10` : 'rgba(255,255,255,0.02)'
+                            }}
+                          >
+                            {processObj?.name || 'Fluxo Geral'}
+                          </span>
+                          
+                          <span className={`px-2 py-0.5 text-[8px] font-bold rounded-md uppercase tracking-wider ${
+                            task.status === 'DONE' 
+                              ? 'bg-accent-mint/10 text-accent-mint border border-accent-mint/20' 
+                              : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                          }`}>
+                            {task.status === 'DONE' ? 'Concluído' : 'Em andamento'}
+                          </span>
+                        </div>
+
+                        {/* Title */}
+                        <h4 className="font-bold text-white text-sm line-clamp-1 mt-1">{task.title}</h4>
+                        
+                        {/* Description */}
+                        {task.description && (
+                          <p className="text-[11px] text-text-muted line-clamp-2 leading-relaxed">{task.description}</p>
+                        )}
+                      </div>
+
+                      {/* Progression bar */}
+                      {totalCheck > 0 && (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-[9px] text-text-muted">
+                            <span className="flex items-center gap-1 font-semibold">
+                              <CheckSquare size={10} />
+                              Checklist de atividades ({doneCheck}/{totalCheck})
+                            </span>
+                            <span className="font-mono">{percent}%</span>
+                          </div>
+                          <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-accent-mint transition-all" style={{ width: `${percent}%` }} />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Footer detail row */}
+                      <div className="flex items-center justify-between pt-3 border-t border-white/[0.04] text-[10px] text-text-muted">
+                        <div className="flex items-center gap-1.5 font-medium">
+                          <User size={12} />
+                          <span>Responsável: {task.responsible || 'Equipe'}</span>
+                        </div>
+
+                        {task.dueDate && (
+                          <div className="flex items-center gap-1 font-semibold text-text-secondary">
+                            <Clock size={11} />
+                            <span>Prazo: {new Date(task.dueDate + "T12:00:00").toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </motion.div>
         )}
 

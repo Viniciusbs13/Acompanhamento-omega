@@ -7,7 +7,8 @@
       "properties": {
         "managerName": { "type": "string" },
         "theme": { "type": "string", "enum": ["light", "dark"] },
-        "trafficPanelUrl": { "type": "string" }
+        "trafficPanelUrl": { "type": "string" },
+        "executiveConfig": { "type": "object" }
       },
       "required": ["managerName", "theme"]
     },
@@ -163,9 +164,82 @@
         "script": { "type": "string" },
         "observations": { "type": "string" },
         "learnings": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "isUrgent": { "type": "boolean" },
         "ownerId": { "type": "string" }
       },
       "required": ["code", "title", "status", "type", "objective", "creationDate", "rating", "ownerId"]
+    },
+    "Processo": {
+      "title": "Process",
+      "description": "A workflow process or pipeline.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "color": { "type": "string" },
+        "icon": { "type": "string" },
+        "teamResponsible": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+        "createdAt": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["name", "color", "status", "createdAt", "ownerId"]
+    },
+    "ProcessColumn": {
+      "title": "Process Column",
+      "description": "A stage or column within a process workflow.",
+      "type": "object",
+      "properties": {
+        "processoId": { "type": "string" },
+        "name": { "type": "string" },
+        "order": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["processoId", "name", "order", "createdAt", "ownerId"]
+    },
+    "ProcessTask": {
+      "title": "Process Task",
+      "description": "A task or card moving through a process workflow.",
+      "type": "object",
+      "properties": {
+        "processoId": { "type": "string" },
+        "columnId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "responsible": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "dueTime": { "type": "string" },
+        "priority": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "URGENT"] },
+        "status": { "type": "string", "enum": ["PENDING", "PROGRESS", "DONE", "DELAYED"] },
+        "labels": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string" },
+        "completedAt": { "type": "string" },
+        "timeSpentSeconds": { "type": "number" },
+        "attachments": { "type": "array" },
+        "checklist": { "type": "array" },
+        "comments": { "type": "array" },
+        "history": { "type": "array" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["processoId", "columnId", "title", "priority", "status", "createdAt", "ownerId"]
+    },
+    "ProcessAutomation": {
+      "title": "Process Automation",
+      "description": "An automation rule linked to a process stage.",
+      "type": "object",
+      "properties": {
+        "processoId": { "type": "string" },
+        "triggerColumnId": { "type": "string" },
+        "actionType": { "type": "string", "enum": ["NOTIFY", "CREATE_TASK", "MARK_DEMAND_DONE", "SET_STATUS_DELAYED"] },
+        "actionParams": { "type": "object" },
+        "isActive": { "type": "boolean" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["processoId", "triggerColumnId", "actionType", "isActive", "ownerId"]
     }
   },
   "firestore": {
@@ -204,6 +278,22 @@
     "/financial_goals/{goalId}": {
       "schema": "FinancialGoal",
       "description": "Collection of financial monthly goals."
+    },
+    "/processes/{processId}": {
+      "schema": "Processo",
+      "description": "Collection of workflow processes/pipelines."
+    },
+    "/process_columns/{columnId}": {
+      "schema": "ProcessColumn",
+      "description": "Collection of process stages/columns."
+    },
+    "/process_tasks/{taskId}": {
+      "schema": "ProcessTask",
+      "description": "Collection of workflow tasks."
+    },
+    "/process_automations/{automationId}": {
+      "schema": "ProcessAutomation",
+      "description": "Collection of process automations."
     }
   }
 }

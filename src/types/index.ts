@@ -73,6 +73,7 @@ export interface Client {
       ordinalWeekday?: { ordinal: number; day: number };
       completedDates?: string[];
       deletedDates?: string[];
+      linkedTaskId?: string;
     }[];
   };
   captures?: {
@@ -87,6 +88,7 @@ export interface Client {
     completedDates?: string[];
     deletedDates?: string[];
     notes?: string;
+    linkedTaskId?: string;
   }[];
   meetings?: {
     id: string;
@@ -100,6 +102,7 @@ export interface Client {
     completedDates?: string[];
     deletedDates?: string[];
     notes?: string;
+    linkedTaskId?: string;
   }[];
 }
 
@@ -177,6 +180,7 @@ export interface UserSettings {
   managerName: string;
   theme: 'light' | 'dark';
   trafficPanelUrl?: string;
+  executiveConfig?: any;
 }
 
 export interface Sale {
@@ -282,7 +286,102 @@ export interface Creative {
   observations?: string; // Observações
   learnings?: string; // Aprendizados (large text)
   videoUrl?: string; // Link para o vídeo gravado/editado (Google Drive, Youtube, etc)
+  isUrgent?: boolean; // Urgência do criativo no laboratório
+  clientId?: string; // ID do Cliente associado
+  clientName?: string; // Nome do Cliente
+  priorityOrder?: number; // Ordem de prioridade para drag-and-drop
   ownerId?: string;
 }
 
+export interface Processo {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  icon?: string;
+  teamResponsible?: string[];
+  status: 'ACTIVE' | 'INACTIVE';
+  createdAt: string;
+  ownerId?: string;
+}
 
+export interface ProcessColumn {
+  id: string;
+  processoId: string;
+  name: string;
+  order: number;
+  createdAt: string;
+  ownerId?: string;
+}
+
+export interface TaskAttachment {
+  id: string;
+  name: string;
+  url: string;
+  type: 'IMAGE' | 'VIDEO' | 'PDF' | 'DOC' | 'LINK';
+  createdAt: string;
+}
+
+export interface TaskChecklistItem {
+  id: string;
+  title: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+export interface TaskComment {
+  id: string;
+  userName: string;
+  content: string;
+  createdAt: string; // ISO string
+}
+
+export interface TaskHistoryEntry {
+  id: string;
+  action: string;
+  details?: string;
+  userName: string;
+  createdAt: string; // ISO string
+}
+
+export interface ProcessTask {
+  id: string;
+  processoId: string;
+  columnId: string;
+  title: string;
+  description?: string;
+  clientId?: string;
+  clientName?: string;
+  responsible?: string;
+  dueDate?: string; // YYYY-MM-DD
+  dueTime?: string; // HH:MM
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  status: 'PENDING' | 'PROGRESS' | 'DONE' | 'DELAYED';
+  labels?: string[];
+  createdAt: string;
+  completedAt?: string;
+  timeSpentSeconds?: number;
+  attachments?: TaskAttachment[];
+  checklist?: TaskChecklistItem[];
+  comments?: TaskComment[];
+  history?: TaskHistoryEntry[];
+  ownerId?: string;
+  linkedEventId?: string;
+  linkedEventType?: 'content' | 'capture' | 'meeting';
+}
+
+export interface ProcessAutomation {
+  id: string;
+  processoId: string;
+  triggerColumnId: string; // columnId or 'ANY'
+  actionType: 'NOTIFY' | 'CREATE_TASK' | 'MARK_DEMAND_DONE' | 'SET_STATUS_DELAYED';
+  actionParams?: {
+    targetProcessoId?: string;
+    targetColumnId?: string;
+    responsibleUser?: string;
+    notifyUserId?: string;
+    message?: string;
+  };
+  isActive: boolean;
+  ownerId?: string;
+}

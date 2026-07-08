@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Globe, 
@@ -19,6 +19,7 @@ import {
   Sparkles, 
   X, 
   ChevronRight,
+  ChevronDown,
   Sparkle,
   MessageSquare,
   AlertCircle,
@@ -27,7 +28,7 @@ import {
 } from 'lucide-react';
 import { storage } from '../lib/storage';
 import { toast } from 'sonner';
-import { Creative, CreativeStatus } from '../types';
+import { Creative, CreativeStatus, Client } from '../types';
 
 function getGoogleDriveEmbedUrl(url?: string): string | null {
   if (!url) return null;
@@ -46,7 +47,58 @@ function getGoogleDriveEmbedUrl(url?: string): string | null {
 
 export function TrafficWorkspace() {
   const [creatives, setCreatives] = useState<Creative[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [activeClientId, setActiveClientId] = useState<string>('ALL');
   const [loading, setLoading] = useState<boolean>(true);
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
+
+  // Find Omega client
+  const omegaClient = useMemo(() => {
+    return clients.find(c => 
+      c.name.toLowerCase().includes('ômega') || 
+      c.name.toLowerCase().includes('omega')
+    );
+  }, [clients]);
+
+  // Helper to check if a code is Omega (AD001 to AD017)
+  const isOmegaCode = useCallback((code: string): boolean => {
+    if (!code) return false;
+    const cleaned = code.trim().toUpperCase();
+    const match = cleaned.match(/^AD0*(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      return num >= 1 && num <= 17;
+    }
+    return false;
+  }, []);
+
+  // Map creatives so that AD001 to AD017 automatically have Omega client
+  const mappedCreativesList = useMemo(() => {
+    return creatives.map(c => {
+      if (isOmegaCode(c.code) && omegaClient) {
+        return {
+          ...c,
+          clientId: omegaClient.id,
+          clientName: omegaClient.name
+        };
+      }
+      return c;
+    });
+  }, [creatives, omegaClient, isOmegaCode]);
+
+  // Clients that go into the list/modal (excluding Omega)
+  const dropdownClients = useMemo(() => {
+    if (!omegaClient) return clients;
+    return clients.filter(c => c.id !== omegaClient.id);
+  }, [clients, omegaClient]);
+
+  // Selected client if it's from the list
+  const selectedOtherClient = useMemo(() => {
+    if (activeClientId === 'ALL') return null;
+    if (omegaClient && activeClientId === omegaClient.id) return null;
+    return clients.find(c => c.id === activeClientId);
+  }, [activeClientId, omegaClient, clients]);
   
   // Modal & Drawer State
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -62,6 +114,7 @@ export function TrafficWorkspace() {
 
   // Form Fields State
   const [formId, setFormId] = useState<string>('');
+  const [formClientId, setFormClientId] = useState<string>('');
   const [formCode, setFormCode] = useState<string>('');
   const [formTitle, setFormTitle] = useState<string>('');
   const [formStatus, setFormStatus] = useState<CreativeStatus>('IDEIA');
@@ -76,6 +129,10 @@ export function TrafficWorkspace() {
   const [formObservations, setFormObservations] = useState<string>('');
   const [formLearnings, setFormLearnings] = useState<string>('');
   const [formVideoUrl, setFormVideoUrl] = useState<string>('');
+  const [formIsUrgent, setFormIsUrgent] = useState<boolean>(false);
+  const [showUrgentOnly, setShowUrgentOnly] = useState<boolean>(false);
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+  const [clientFormSearchQuery, setClientFormSearchQuery] = useState('');
 
   // Dropdown constants
   const creativeTypes = [
@@ -108,26 +165,28 @@ export function TrafficWorkspace() {
     { value: 'DESCARTADO', label: 'Descartado', color: 'text-accent-coral', bg: 'bg-accent-coral/10 border-accent-coral/20', dot: '🟡' } // red dot
   ];
 
-  // Load Creatives
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const data = await storage.getCreatives();
-      // Sort creatives by code descending or creation date descending
-      const sortedData = data.sort((a, b) => {
-        return b.code.localeCompare(a.code);
-      });
-      setCreatives(sortedData);
-    } catch (error) {
-      toast.error('Erro ao carregar banco de criativos.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Load Creatives & Clients in Realtime
   useEffect(() => {
-    loadData();
+    setLoading(true);
+    const unsubClients = storage.listenToClients((allClients) => {
+      setClients(allClients);
+    });
+
+    const unsubCreatives = storage.listenToCreatives((allCreatives) => {
+      const sortedData = allCreatives.sort((a, b) => b.code.localeCompare(a.code));
+      setCreatives(sortedData);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubClients();
+      unsubCreatives();
+    };
   }, []);
+
+  const loadData = () => {
+    // Real-time updates active
+  };
 
   // Quick Action: Update Status with simple click
   const handleQuickStatusChange = async (creative: Creative, newStatus: CreativeStatus) => {
@@ -173,10 +232,11 @@ export function TrafficWorkspace() {
 
   // Calculate stats for top of page
   const stats = useMemo(() => {
-    const total = creatives.length;
-    const validados = creatives.filter(c => c.status === 'VALIDADO');
-    const emProducao = creatives.filter(c => c.status === 'PRODUZIDO');
-    const descartados = creatives.filter(c => c.status === 'DESCARTADO');
+    const activeClientCreatives = activeClientId === 'ALL' ? mappedCreativesList : mappedCreativesList.filter(c => c.clientId === activeClientId);
+    const total = activeClientCreatives.length;
+    const validados = activeClientCreatives.filter(c => c.status === 'VALIDADO');
+    const emProducao = activeClientCreatives.filter(c => c.status === 'PRODUZIDO');
+    const descartados = activeClientCreatives.filter(c => c.status === 'DESCARTADO');
     
     // Validation Rate: (Validado / Total) * 100
     const validationRate = total > 0 ? ((validados.length / total) * 100).toFixed(0) : '0';
@@ -197,7 +257,7 @@ export function TrafficWorkspace() {
       validationRate: `${validationRate}%`,
       lastValidated
     };
-  }, [creatives]);
+  }, [mappedCreativesList, activeClientId]);
 
   // Next automatic code calculation (AD001, AD002, AD003...)
   const nextAutomaticCode = useMemo(() => {
@@ -231,6 +291,8 @@ export function TrafficWorkspace() {
     setFormObservations('');
     setFormLearnings('');
     setFormVideoUrl('');
+    setFormIsUrgent(false);
+    setFormClientId(activeClientId === 'ALL' ? '' : activeClientId);
     setSelectedCreative(null);
     setIsFormOpen(true);
   };
@@ -253,6 +315,8 @@ export function TrafficWorkspace() {
     setFormObservations(creative.observations || '');
     setFormLearnings(creative.learnings || '');
     setFormVideoUrl(creative.videoUrl || '');
+    setFormIsUrgent(creative.isUrgent || false);
+    setFormClientId(creative.clientId || '');
     setSelectedCreative(creative);
     setIsFormOpen(true);
   };
@@ -265,6 +329,7 @@ export function TrafficWorkspace() {
       return;
     }
 
+    const selectedClient = clients.find(c => c.id === formClientId);
     const payload: Creative = {
       id: formId,
       code: formCode,
@@ -281,6 +346,9 @@ export function TrafficWorkspace() {
       observations: formObservations.trim() || undefined,
       learnings: formLearnings.trim() || undefined,
       videoUrl: formVideoUrl.trim() || undefined,
+      isUrgent: formIsUrgent,
+      clientId: formClientId || undefined,
+      clientName: selectedClient ? selectedClient.name : undefined,
     };
 
     // Auto validation logic: if status is VALIDADO and validationDate is empty, fill with today
@@ -341,7 +409,7 @@ export function TrafficWorkspace() {
 
   // Filter creatives list
   const filteredCreatives = useMemo(() => {
-    return creatives.filter(c => {
+    return mappedCreativesList.filter(c => {
       // Search
       const matchesSearch = 
         c.title.toLowerCase().includes(search.toLowerCase()) || 
@@ -361,14 +429,21 @@ export function TrafficWorkspace() {
       // Rating
       const matchesRating = ratingFilter === 'ALL' || c.rating === ratingFilter;
 
-      return matchesSearch && matchesStatus && matchesType && matchesObjective && matchesRating;
+      // Urgent
+      const matchesUrgent = !showUrgentOnly || c.isUrgent === true;
+
+      // Client ID
+      const matchesClient = activeClientId === 'ALL' || c.clientId === activeClientId;
+
+      return matchesSearch && matchesStatus && matchesType && matchesObjective && matchesRating && matchesUrgent && matchesClient;
     });
-  }, [creatives, search, statusFilter, typeFilter, objectiveFilter, ratingFilter]);
+  }, [mappedCreativesList, search, statusFilter, typeFilter, objectiveFilter, ratingFilter, showUrgentOnly, activeClientId]);
 
   // Hall of Winners (Only VALIDADO)
   const hallOfWinners = useMemo(() => {
-    return creatives.filter(c => c.status === 'VALIDADO');
-  }, [creatives]);
+    const base = mappedCreativesList.filter(c => c.status === 'VALIDADO');
+    return activeClientId === 'ALL' ? base : base.filter(c => c.clientId === activeClientId);
+  }, [mappedCreativesList, activeClientId]);
 
   // Formatting date functions
   const formatDateString = (dt: string | undefined) => {
@@ -403,6 +478,71 @@ export function TrafficWorkspace() {
         >
           <Plus size={18} />
           Novo Criativo
+        </button>
+      </div>
+
+      {/* Abas de Clientes */}
+      <div className="flex flex-wrap items-center gap-2 pb-4 border-b border-white/[0.06] overflow-x-auto select-none">
+        {/* Todos */}
+        <button
+          onClick={() => setActiveClientId('ALL')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border shrink-0 cursor-pointer flex items-center gap-2 ${
+            activeClientId === 'ALL'
+              ? "bg-accent-mint/15 text-accent-mint border-accent-mint/30 shadow-[0_0_12px_rgba(4,221,114,0.08)] font-bold"
+              : "bg-white/5 text-text-secondary border-white/5 hover:bg-white/10 hover:text-white"
+          }`}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-accent-mint" />
+          Todos os Clientes
+        </button>
+
+        {/* Assessoria Ômega */}
+        <button
+          onClick={() => {
+            if (omegaClient) {
+              setActiveClientId(omegaClient.id);
+            } else {
+              toast.error("Cliente Ômega não encontrado na base de dados. Cadastre Ômega na aba de Clientes.");
+            }
+          }}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border shrink-0 cursor-pointer flex items-center gap-2 ${
+            omegaClient && activeClientId === omegaClient.id
+              ? "bg-[#04DD72]/15 text-[#04DD72] border-[#04DD72]/30 shadow-[0_0_12px_rgba(4,221,114,0.08)] font-bold"
+              : "bg-white/5 text-text-secondary border-white/5 hover:bg-white/10 hover:text-white"
+          }`}
+          style={{
+            borderColor: omegaClient && activeClientId === omegaClient.id ? omegaClient.brandColor || '#04DD72' : 'transparent',
+          }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: omegaClient?.brandColor || '#04DD72' }} />
+          {omegaClient ? omegaClient.name : "Assessoria Ômega"}
+        </button>
+
+        {/* Botão para Abrir Modal de Outros Clientes */}
+        <button
+          type="button"
+          onClick={() => setIsClientModalOpen(true)}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border shrink-0 cursor-pointer flex items-center gap-2 ${
+            selectedOtherClient
+              ? "bg-white/10 text-white border-white/20 font-bold"
+              : "bg-white/5 text-text-secondary border-white/5 hover:bg-white/10 hover:text-white"
+          }`}
+          style={{
+            borderColor: selectedOtherClient ? selectedOtherClient.brandColor || '#04DD72' : 'transparent',
+          }}
+        >
+          {selectedOtherClient ? (
+            <>
+              <span className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse" style={{ backgroundColor: selectedOtherClient.brandColor || '#04DD72' }} />
+              <span>Cliente: {selectedOtherClient.name}</span>
+            </>
+          ) : (
+            <>
+              <Filter size={12} className="text-text-muted" />
+              <span>Outros Clientes</span>
+            </>
+          )}
+          <ChevronDown size={14} className="text-text-muted opacity-80" />
         </button>
       </div>
 
@@ -511,9 +651,23 @@ export function TrafficWorkspace() {
         {/* Header & Controls */}
         <div className="p-6 md:p-8 border-b border-white/5 space-y-4 bg-gradient-to-b from-white/[0.012] to-transparent">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <h2 className="text-lg font-bold tracking-tight text-white text-left">
-              Biblioteca do Laboratório
-            </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <h2 className="text-lg font-bold tracking-tight text-white text-left">
+                Biblioteca do Laboratório
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowUrgentOnly(!showUrgentOnly)}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                  showUrgentOnly
+                    ? 'bg-accent-coral/20 text-accent-coral border-accent-coral/40 shadow-[0_0_12px_rgba(255,90,95,0.25)]'
+                    : 'bg-white/5 text-text-muted hover:text-white border-white/10'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${showUrgentOnly ? 'bg-accent-coral animate-pulse' : 'bg-white/40'}`} />
+                {showUrgentOnly ? 'Apenas Urgentes' : 'Filtrar Urgentes'}
+              </button>
+            </div>
             <p className="text-xs text-text-secondary">
               Gerencie scripts, ideias brutas, notas internas e relacione os aprendizados coletados.
             </p>
@@ -649,6 +803,9 @@ export function TrafficWorkspace() {
                       {/* Title */}
                       <td className="py-4 px-4 text-xs font-medium text-white max-w-[280px]">
                         <div className="font-semibold text-white group-hover:text-accent-mint transition-colors truncate flex items-center gap-1.5">
+                          {c.isUrgent && (
+                            <span className="shrink-0 w-2 h-2 rounded-full bg-accent-coral shadow-[0_0_8px_#FF5A5F]" title="Urgente" />
+                          )}
                           <span className="truncate">{c.title}</span>
                           {c.videoUrl && (
                             <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-accent-mint/10 border border-accent-mint/25 text-[9px] font-bold text-accent-mint tracking-wider" title="Vídeo Final anexado">
@@ -657,11 +814,18 @@ export function TrafficWorkspace() {
                             </span>
                           )}
                         </div>
-                        {c.script && (
-                          <div className="text-[10px] text-text-muted mt-1 truncate">
-                            {c.script.substring(0, 70)}...
-                          </div>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1 mt-1">
+                          {c.clientName && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/5 border border-white/5 text-[9px] text-text-muted font-mono">
+                              {c.clientName}
+                            </span>
+                          )}
+                          {c.script && (
+                            <div className="text-[10px] text-text-muted truncate">
+                              {c.script.substring(0, 50)}...
+                            </div>
+                          )}
+                        </div>
                       </td>
 
                       {/* Dynamic Clickable Status */}
@@ -788,6 +952,12 @@ export function TrafficWorkspace() {
                   <span className="text-xs bg-accent-mint/10 border border-accent-mint/20 text-accent-mint font-bold font-mono px-2.5 py-1 rounded-lg">
                     {selectedCreative.code}
                   </span>
+                  {selectedCreative.isUrgent && (
+                    <span className="text-[10px] bg-accent-coral/20 border border-accent-coral/30 text-accent-coral font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 tracking-wider uppercase">
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent-coral" />
+                      Urgente
+                    </span>
+                  )}
                   <div>
                     <h3 className="font-bold text-white text-base leading-tight truncate max-w-[340px]">
                       {selectedCreative.title}
@@ -1044,6 +1214,116 @@ export function TrafficWorkspace() {
               {/* Form inputs scrolling area */}
               <form onSubmit={handleSubmitCreative} className="flex-1 overflow-y-auto p-5 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                  {/* Associar Cliente */}
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
+                      Cliente Associado <span className="text-accent-coral">*</span>
+                    </label>
+                    {/* Reusable custom popover selector with search */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
+                        className="w-full bg-[#141416] border border-white/10 hover:border-white/20 focus:border-accent-mint/50 rounded-xl px-4 py-3 text-xs text-white text-left flex items-center justify-between outline-none transition-all cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2">
+                          {(() => {
+                            const selected = clients.find(c => c.id === formClientId);
+                            if (selected) {
+                              return (
+                                <>
+                                  <div 
+                                    className="w-2 h-2 rounded-full shrink-0" 
+                                    style={{ backgroundColor: selected.brandColor || '#8B5CF6' }}
+                                  />
+                                  <span>{selected.name}</span>
+                                </>
+                              );
+                            }
+                            return <span className="text-text-muted">Selecione um Cliente</span>;
+                          })()}
+                        </span>
+                        <ChevronDown size={14} className="text-text-muted" />
+                      </button>
+                      
+                      {isClientDropdownOpen && (
+                        <>
+                          {/* Click outside overlay */}
+                          <div 
+                            className="fixed inset-0 z-40" 
+                            onClick={() => {
+                              setIsClientDropdownOpen(false);
+                              setClientFormSearchQuery('');
+                            }} 
+                          />
+                          
+                          {/* Dropdown panel */}
+                          <div className="absolute left-0 right-0 mt-1 bg-[#141416] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-60 text-left">
+                            <div className="p-2 border-b border-white/5 bg-[#0D0D0E] flex items-center gap-2">
+                              <Search size={12} className="text-text-muted ml-2 shrink-0" />
+                              <input
+                                type="text"
+                                placeholder="Buscar cliente..."
+                                value={clientFormSearchQuery}
+                                onChange={(e) => setClientFormSearchQuery(e.target.value)}
+                                className="w-full bg-transparent border-none text-xs text-white outline-none py-1 placeholder:text-text-muted focus:ring-0 focus:outline-none"
+                                autoFocus
+                              />
+                              {clientFormSearchQuery && (
+                                <button 
+                                  type="button" 
+                                  onClick={() => setClientFormSearchQuery('')}
+                                  className="p-1 hover:bg-white/5 rounded text-text-muted hover:text-white"
+                                >
+                                  <X size={10} />
+                                </button>
+                              )}
+                            </div>
+                            <div className="overflow-y-auto flex-1 py-1 max-h-44">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormClientId('');
+                                  setIsClientDropdownOpen(false);
+                                  setClientFormSearchQuery('');
+                                }}
+                                className={`w-full text-left px-4 py-2.5 text-xs hover:bg-white/5 transition-colors ${!formClientId ? 'text-accent-mint font-semibold bg-accent-mint/5' : 'text-text-muted'}`}
+                              >
+                                Selecione um Cliente
+                              </button>
+                              {clients
+                                .filter(c => c.name.toLowerCase().includes(clientFormSearchQuery.toLowerCase()))
+                                .map(c => (
+                                  <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setFormClientId(c.id);
+                                      setIsClientDropdownOpen(false);
+                                      setClientFormSearchQuery('');
+                                    }}
+                                    className={`w-full text-left px-4 py-2.5 text-xs hover:bg-white/5 transition-all flex items-center gap-2 ${formClientId === c.id ? 'text-accent-mint font-semibold bg-accent-mint/5' : 'text-white'}`}
+                                  >
+                                    <div 
+                                      className="w-2 h-2 rounded-full shrink-0" 
+                                      style={{ backgroundColor: c.brandColor || '#8B5CF6' }}
+                                    />
+                                    <span>{c.name}</span>
+                                  </button>
+                                ))
+                              }
+                              {clients.filter(c => c.name.toLowerCase().includes(clientFormSearchQuery.toLowerCase())).length === 0 && (
+                                <div className="px-4 py-3 text-xs text-text-muted text-center italic">
+                                  Nenhum cliente encontrado
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Title */}
                   <div className="space-y-1 md:col-span-2">
                     <label className="text-[10px] font-bold text-text-muted uppercase tracking-widest">
@@ -1057,6 +1337,28 @@ export function TrafficWorkspace() {
                       onChange={(e) => setFormTitle(e.target.value)}
                       className="w-full bg-white/5 border border-white/10 hover:border-white/20 focus:border-accent-mint/50 rounded-xl px-4 py-3 text-xs text-white outline-none transition-all placeholder:text-text-muted"
                     />
+                  </div>
+
+                  {/* Urgência Toggle */}
+                  <div className="space-y-1 md:col-span-2 bg-white/5 border border-white/5 rounded-2xl p-4 flex items-center justify-between gap-4 border border-white/10">
+                    <div className="space-y-0.5 text-left">
+                      <div className="text-xs font-bold text-white flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-accent-coral" />
+                        Marcar como Urgente (Prioritário)
+                      </div>
+                      <div className="text-[10px] text-text-muted">
+                        Destaca este criativo com um marcador vermelho de prioridade máxima no banco.
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={formIsUrgent}
+                        onChange={(e) => setFormIsUrgent(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-coral"></div>
+                    </label>
                   </div>
 
                   {/* Status selection */}
@@ -1274,6 +1576,141 @@ export function TrafficWorkspace() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL DE SELEÇÃO E BUSCA DE CLIENTES */}
+      <AnimatePresence>
+        {isClientModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setIsClientModalOpen(false);
+                setClientSearchQuery('');
+              }}
+              className="absolute inset-0 bg-black/85 backdrop-blur-md"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', duration: 0.4 }}
+              className="relative w-full max-w-lg bg-[#141416] border border-white/10 rounded-3xl overflow-hidden shadow-2xl shadow-black/90 flex flex-col max-h-[80vh] text-left"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-accent-mint/10 border border-accent-mint/20 flex items-center justify-center text-accent-mint">
+                    <Filter size={16} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-base">Filtrar por Cliente</h3>
+                    <p className="text-[10px] text-text-muted">Selecione ou busque o cliente desejado</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsClientModalOpen(false);
+                    setClientSearchQuery('');
+                  }}
+                  className="p-1 px-2.5 py-2 rounded-lg hover:bg-white/5 text-text-muted hover:text-white transition-all cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Search Box */}
+              <div className="p-4 bg-white/[0.02] border-b border-white/[0.06] relative">
+                <div className="absolute left-7 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none">
+                  <Search size={14} />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Buscar pelo nome do cliente..."
+                  value={clientSearchQuery}
+                  onChange={(e) => setClientSearchQuery(e.target.value)}
+                  className="w-full bg-[#050506] border border-white/10 hover:border-white/15 focus:border-accent-mint/40 rounded-xl pl-9 pr-4 py-3 text-xs text-white outline-none transition-all placeholder:text-text-muted"
+                  autoFocus
+                />
+              </div>
+
+              {/* List of Clients */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-[350px] custom-scrollbar">
+                {/* Option for ALL */}
+                <button
+                  onClick={() => {
+                    setActiveClientId('ALL');
+                    setIsClientModalOpen(false);
+                    setClientSearchQuery('');
+                  }}
+                  className={`w-full text-left p-3.5 rounded-2xl border transition-all flex items-center justify-between cursor-pointer ${
+                    activeClientId === 'ALL'
+                      ? 'bg-accent-mint/15 border-accent-mint/30 text-accent-mint font-bold shadow-[0_0_12px_rgba(4,221,114,0.05)]'
+                      : 'bg-white/5 border-transparent text-text-secondary hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-2.5 h-2.5 rounded-full bg-accent-mint" />
+                    <span className="text-sm font-semibold">Todos os Clientes</span>
+                  </div>
+                  {activeClientId === 'ALL' && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-accent-mint bg-accent-mint/10 px-2.5 py-1 rounded-lg">Selecionado</span>
+                  )}
+                </button>
+
+                {/* Filtered dropdown clients */}
+                {(() => {
+                  const filtered = dropdownClients.filter(c =>
+                    c.name.toLowerCase().includes(clientSearchQuery.toLowerCase())
+                  );
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="py-12 text-center text-text-muted italic text-xs">
+                        Nenhum cliente encontrado com "{clientSearchQuery}"
+                      </div>
+                    );
+                  }
+
+                  return filtered.map(c => {
+                    const isSelected = activeClientId === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          setActiveClientId(c.id);
+                          setIsClientModalOpen(false);
+                          setClientSearchQuery('');
+                        }}
+                        className={`w-full text-left p-3.5 rounded-2xl border transition-all flex items-center justify-between cursor-pointer ${
+                          isSelected
+                            ? 'bg-white/10 border-white/20 text-white font-bold'
+                            : 'bg-white/5 border-transparent text-text-secondary hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: c.brandColor || '#04DD72' }}
+                          />
+                          <span className="text-sm font-semibold truncate">{c.name}</span>
+                        </div>
+                        {isSelected && (
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-white bg-white/10 px-2.5 py-1 rounded-lg shrink-0">Selecionado</span>
+                        )}
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
             </motion.div>
           </div>
         )}

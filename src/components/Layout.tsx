@@ -15,7 +15,9 @@ import {
   EyeOff,
   DollarSign,
   Calendar,
-  Globe
+  Globe,
+  Target,
+  Layers
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { cn } from '../lib/utils';
@@ -53,8 +55,9 @@ export function Layout() {
   };
 
   const navItems = [
-    { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    { label: 'Dashboard Executivo', icon: Target, path: '/dashboard-executivo' },
     { label: 'Demandas', icon: Calendar, path: '/demandas' },
+    { label: 'Processos', icon: Layers, path: '/processos' },
     { label: 'Clientes', icon: Users, path: '/clientes' },
     { label: 'Comercial', icon: DollarSign, path: '/comercial' },
     { label: 'Gestão de Carteira', icon: Briefcase, path: '/gestao' },
@@ -69,7 +72,7 @@ export function Layout() {
       {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex w-64 flex-col border-r border-border-subtle bg-bg-elevated/50 backdrop-blur-xl sticky top-0 h-screen">
         <div className="p-8">
-          <Link to="/dashboard" className="flex items-center gap-2 group">
+          <Link to="/dashboard-executivo" className="flex items-center gap-2 group">
             <div className="w-8 h-8 rounded-lg bg-accent-mint flex items-center justify-center text-bg-base font-bold shadow-[0_0_20px_-5px_#00D9A3]">Ω</div>
             <span className="text-xl font-medium tracking-tighter">Ômega</span>
           </Link>
@@ -124,7 +127,7 @@ export function Layout() {
         {/* Topbar */}
         <header className="h-16 border-b border-border-subtle bg-bg-base/80 backdrop-blur-md sticky top-0 z-30 flex items-center px-4 md:px-8 gap-4">
           <div className="flex lg:hidden">
-             <Link to="/dashboard" className="text-2xl font-bold mr-4">Ω</Link>
+             <Link to="/dashboard-executivo" className="text-2xl font-bold mr-4">Ω</Link>
           </div>
 
           <div className="hidden md:flex items-center gap-2 text-xs font-medium text-text-muted uppercase tracking-widest">

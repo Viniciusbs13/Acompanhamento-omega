@@ -27,11 +27,14 @@ import {
   DollarSign,
   Zap,
   BarChart2,
-  FileText
+  FileText,
+  GripVertical,
+  Video,
+  Star
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { storage } from '../lib/storage';
-import { Client, MetricEntry } from '../types';
+import { Client, MetricEntry, Creative } from '../types';
 import { calculateMetrics } from '../lib/calculations';
 import { toast } from 'sonner';
 import { 
@@ -93,6 +96,9 @@ interface DemandItem {
 export function Demands() {
   const [clients, setClients] = useState<Client[]>([]);
   const [allEntries, setAllEntries] = useState<MetricEntry[]>([]);
+  const [creatives, setCreatives] = useState<Creative[]>([]);
+  const [kanbanTasks, setKanbanTasks] = useState<any[]>([]);
+  const [draggedCreativeId, setDraggedCreativeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -106,19 +112,28 @@ export function Demands() {
     setLoading(true);
     const unsubClients = storage.listenToClients((allClients) => {
       setClients(allClients);
-      if (allEntries.length > 0) setLoading(false);
     });
 
     const unsubEntries = storage.listenToAllEntries((entries) => {
       setAllEntries(entries);
+    });
+
+    const unsubCreatives = storage.listenToCreatives((allCreatives) => {
+      setCreatives(allCreatives);
       setLoading(false);
+    });
+
+    const unsubKanban = storage.listenToAllTasks((allTasks) => {
+      setKanbanTasks(allTasks);
     });
 
     return () => {
       unsubClients();
       unsubEntries();
+      unsubCreatives();
+      unsubKanban();
     };
-  }, [allEntries.length]);
+  }, []);
 
   const matchesRecurrence = useCallback((date: Date, event: any, isRecurringClient: boolean) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -150,6 +165,82 @@ export function Demands() {
         return false;
     }
   }, []);
+
+  const sortedCreatives = useMemo(() => {
+    return [...creatives].sort((a, b) => {
+      if (a.priorityOrder !== undefined && b.priorityOrder !== undefined) {
+        return a.priorityOrder - b.priorityOrder;
+      }
+      if (a.priorityOrder !== undefined) return -1;
+      if (b.priorityOrder !== undefined) return 1;
+      
+      const dateA = a.creationDate || '';
+      const dateB = b.creationDate || '';
+      if (dateA !== dateB) return dateB.localeCompare(dateA);
+      return b.code.localeCompare(a.code);
+    });
+  }, [creatives]);
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedCreativeId(id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (!draggedCreativeId) return;
+
+    const draggedIndex = sortedCreatives.findIndex(c => c.id === draggedCreativeId);
+    if (draggedIndex === -1 || draggedIndex === targetIndex) return;
+
+    const updatedList = [...sortedCreatives];
+    const [draggedItem] = updatedList.splice(draggedIndex, 1);
+    updatedList.splice(targetIndex, 0, draggedItem);
+
+    const toastId = toast.loading('Salvando nova ordem de prioridade...');
+    try {
+      for (let i = 0; i < updatedList.length; i++) {
+        const item = updatedList[i];
+        await storage.saveCreative({
+          ...item,
+          priorityOrder: i
+        });
+      }
+      toast.success('Fila de criativos reordenada com sucesso!', { id: toastId });
+    } catch (err) {
+      toast.error('Erro ao reordenar criativos.', { id: toastId });
+    } finally {
+      setDraggedCreativeId(null);
+    }
+  };
+
+  const handleToggleUrgent = async (creative: Creative) => {
+    try {
+      await storage.saveCreative({
+        ...creative,
+        isUrgent: !creative.isUrgent
+      });
+      toast.success(`Urgência de ${creative.code} atualizada!`);
+    } catch (err) {
+      toast.error('Erro ao atualizar urgência.');
+    }
+  };
+
+  const handleUpdateCreativeStatus = async (creative: Creative, newStatus: any) => {
+    try {
+      await storage.saveCreative({
+        ...creative,
+        status: newStatus
+      });
+      toast.success(`Status de ${creative.code} alterado para ${newStatus}!`);
+    } catch (err) {
+      toast.error('Erro ao atualizar status.');
+    }
+  };
 
   const allDemands = useMemo(() => {
     const demands: DemandItem[] = [];
@@ -278,8 +369,44 @@ export function Demands() {
       });
     });
 
+    // Injetar tarefas do fluxo operacional Kanban na agenda
+    kanbanTasks.forEach(task => {
+      if (!task.dueDate) return;
+      
+      const taskDate = startOfDay(new Date(task.dueDate + "T12:00:00"));
+      if (taskDate < rangeStart || taskDate > rangeEnd) return;
+
+      const isRealMonth = taskDate.getMonth() === realCurrentMonth && taskDate.getFullYear() === realCurrentYear;
+      
+      let statusValue: DemandStatus = 'PENDENTE';
+      if (task.status === 'DONE') {
+        statusValue = 'CONCLUIDO';
+      } else {
+        const isAtrasada = isRealMonth && isPast(taskDate) && !isToday(taskDate);
+        statusValue = isAtrasada ? 'ATRASADO' : (task.status === 'PROGRESS' ? 'EM_ANDAMENTO' : 'PENDENTE');
+      }
+
+      // Buscar cor do cliente
+      const taskClient = clients.find(c => c.id === task.clientId);
+
+      demands.push({
+        id: task.id,
+        clientId: task.clientId || 'general',
+        clientName: task.clientName || 'Geral / Agência',
+        clientColor: taskClient?.brandColor || '#8B5CF6',
+        title: `[Kanban] ${task.title}`,
+        date: task.dueDate,
+        type: 'TASK',
+        status: statusValue,
+        priority: task.priority === 'URGENT' ? 'URGENTE' : (task.priority === 'HIGH' ? 'ALTA' : (task.priority === 'LOW' ? 'BAIXA' : 'MEDIA')),
+        responsible: task.responsible,
+        notes: task.description,
+        originalItem: task
+      });
+    });
+
     return demands;
-  }, [clients, currentDate, matchesRecurrence]);
+  }, [clients, currentDate, matchesRecurrence, kanbanTasks]);
 
   const filteredDemands = useMemo(() => {
     return allDemands.filter(d => {
@@ -389,6 +516,30 @@ export function Demands() {
   const handleUpdateStatus = async (demand: DemandItem, newStatus: DemandStatus) => {
     const toastId = toast.loading('Atualizando status...');
     try {
+      if (demand.type === 'TASK') {
+        const originalTask = demand.originalItem;
+        if (originalTask) {
+          const updatedTask = {
+            ...originalTask,
+            status: newStatus === 'CONCLUIDO' ? 'DONE' : 'PROGRESS',
+            completedAt: newStatus === 'CONCLUIDO' ? new Date().toISOString() : null,
+            history: [
+              ...(originalTask.history || []),
+              {
+                id: 'h-sync-' + Date.now(),
+                action: 'Status Sincronizado',
+                details: `Status alterado de forma bidirecional via agenda de demandas para "${newStatus}".`,
+                userName: 'Calendário Geral',
+                createdAt: new Date().toISOString()
+              }
+            ]
+          };
+          await storage.saveTask(updatedTask);
+          toast.success('Status da tarefa Kanban sincronizado com sucesso!', { id: toastId });
+          return;
+        }
+      }
+
       const client = clients.find(c => c.id === demand.clientId);
       if (!client) throw new Error('Cliente não encontrado');
 
@@ -433,6 +584,81 @@ export function Demands() {
     }
   };
 
+  const handleDeleteDemand = async (demand: DemandItem) => {
+    if (!window.confirm(`Tem certeza de que deseja excluir a demanda "${demand.title}"?`)) {
+      return;
+    }
+    const toastId = toast.loading('Excluindo demanda...');
+    try {
+      if (demand.type === 'TASK') {
+        const originalTask = demand.originalItem;
+        if (originalTask) {
+          await storage.deleteTask(originalTask.id);
+          setKanbanTasks(prev => prev.filter(t => t.id !== originalTask.id));
+          toast.success('Tarefa Kanban excluída com sucesso!', { id: toastId });
+          return;
+        }
+      }
+
+      const client = clients.find(c => c.id === demand.clientId);
+      if (!client) throw new Error('Cliente não encontrado');
+
+      const updatedClient = { ...client };
+      const dateStr = demand.date;
+
+      if (demand.type === 'CONTENT') {
+        if (updatedClient.contentPlan?.items) {
+          const itemIndex = updatedClient.contentPlan.items.findIndex(i => i.id === (demand.id.split('-')[0]));
+          if (itemIndex !== -1) {
+            const item = updatedClient.contentPlan.items[itemIndex];
+            const isRecurring = item.recurrenceType 
+              ? item.recurrenceType !== 'NONE'
+              : (item.isRecurring || (item.recurringDays && item.recurringDays.length > 0) || (client.billingModel === 'RECURRING' && !item.recurringDays));
+            
+            if (isRecurring) {
+              item.deletedDates = [...(item.deletedDates || []), dateStr];
+            } else {
+              updatedClient.contentPlan.items = updatedClient.contentPlan.items.filter(i => i.id !== item.id);
+              updatedClient.contentPlan.total = updatedClient.contentPlan.items.length;
+            }
+          }
+        }
+      } else if (demand.type === 'CAPTURE') {
+        if (updatedClient.captures) {
+          const itemIndex = updatedClient.captures.findIndex(i => i.id === demand.id);
+          if (itemIndex !== -1) {
+            const item = updatedClient.captures[itemIndex];
+            const isRecurring = item.recurrenceType && item.recurrenceType !== 'NONE';
+            if (isRecurring) {
+              item.deletedDates = [...(item.deletedDates || []), dateStr];
+            } else {
+              updatedClient.captures = updatedClient.captures.filter(i => i.id !== demand.id);
+            }
+          }
+        }
+      } else if (demand.type === 'MEETING') {
+        if (updatedClient.meetings) {
+          const itemIndex = updatedClient.meetings.findIndex(i => i.id === demand.id);
+          if (itemIndex !== -1) {
+            const item = updatedClient.meetings[itemIndex];
+            const isRecurring = item.recurrenceType && item.recurrenceType !== 'NONE';
+            if (isRecurring) {
+              item.deletedDates = [...(item.deletedDates || []), dateStr];
+            } else {
+              updatedClient.meetings = updatedClient.meetings.filter(i => i.id !== demand.id);
+            }
+          }
+        }
+      }
+
+      await storage.saveClient(updatedClient);
+      setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
+      toast.success('Demanda excluída!', { id: toastId });
+    } catch (error) {
+      toast.error('Erro ao excluir demanda', { id: toastId });
+    }
+  };
+
   return (
     <div className="space-y-8 pb-20">
       {/* Header & Stats */}
@@ -474,119 +700,6 @@ export function Demands() {
               <FileText size={14} />
               Relatório IA
             </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-        <SummaryCard label="Demandas Hoje" value={stats.today} icon={CalendarIcon} color="text-accent-mint" />
-        <SummaryCard label="Atrasadas" value={stats.delayed} icon={AlertCircle} color="text-accent-coral" />
-        <SummaryCard label="Concluídas" value={stats.completed} icon={CheckCircle2} color="text-accent-mint" />
-        <SummaryCard label="Investimento" value={formatCurrency(stats.totalInvestment)} icon={DollarSign} color="text-accent-amber" />
-        <SummaryCard label="Faturamento" value={formatCurrency(stats.totalRevenue)} icon={TrendingUp} color="text-accent-mint" />
-        <SummaryCard label="Total Leads" value={stats.totalLeads} icon={Zap} color="text-accent-amber" />
-        <SummaryCard label="ROAS Médio" value={stats.averageROAS.toFixed(2) + 'x'} icon={BarChart2} color="text-accent-mint" />
-        
-        <div className="glass p-4 rounded-2xl flex flex-col gap-2 border border-white/5 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-16 h-16 bg-white/[0.02] -mr-8 -mt-8 rounded-full blur-xl group-hover:bg-white/[0.05] transition-all" />
-          <div className="flex items-center justify-between">
-             <LayoutDashboard size={16} className="text-text-muted" />
-             <div className={cn("w-2 h-2 rounded-full", stats.overloadedDays > 0 ? "bg-accent-coral" : "bg-accent-mint")} />
-          </div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Equipe</p>
-          <p className="text-xl font-medium mt-0.5 truncate">{stats.overloadedDays > 0 ? 'CRÍTICA' : 'ESTÁVEL'}</p>
-        </div>
-      </div>
-
-      {/* Metrics Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 glass rounded-3xl p-6 border border-white/5">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h3 className="text-lg font-medium">Performance Integrada</h3>
-              <p className="text-xs text-text-secondary">Soma de todos os lançamentos por período</p>
-            </div>
-            <div className="flex items-center gap-4">
-               <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-accent-mint" />
-                  <span className="text-[10px] text-text-secondary font-bold uppercase">Investimento</span>
-               </div>
-               <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-accent-amber" />
-                  <span className="text-[10px] text-text-secondary font-bold uppercase">Leads</span>
-               </div>
-            </div>
-          </div>
-          <div className="h-[240px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00D9A3" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#00D9A3" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fill: '#6B7280' }}
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fill: '#6B7280' }}
-                />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0A0A0B', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
-                  itemStyle={{ fontSize: '10px' }}
-                />
-                <Area type="monotone" dataKey="investment" stroke="#00D9A3" fillOpacity={1} fill="url(#colorValue)" />
-                <Area type="monotone" dataKey="leads" stroke="#FACC15" fillOpacity={0} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="glass rounded-3xl p-6 border border-white/5 flex flex-col justify-center">
-          <div className="space-y-6">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Resumo Comercial</h3>
-            <div className="space-y-4">
-              <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold text-text-muted uppercase">ROI Geral Médio</span>
-                  <span className={cn("text-xs font-medium", stats.averageROAS >= 3 ? "text-accent-mint" : "text-accent-amber")}>
-                    {stats.averageROAS.toFixed(1)}x
-                  </span>
-                </div>
-                <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-                  <div className={cn("h-full transition-all duration-1000", stats.averageROAS >= 3 ? "bg-accent-mint" : "bg-accent-amber")} style={{ width: `${Math.min((stats.averageROAS / 10) * 100, 100)}%` }} />
-                </div>
-              </div>
-              <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold text-text-muted uppercase">Meta de Leads Mensal</span>
-                  <span className="text-xs text-accent-amber font-medium">{stats.totalLeads} / 5000</span>
-                </div>
-                <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-                  <div className="bg-accent-amber h-full transition-all duration-1000" style={{ width: `${Math.min((stats.totalLeads / 5000) * 100, 100)}%` }} />
-                </div>
-              </div>
-              <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold text-text-muted uppercase">Saúde Financeira</span>
-                  <span className="text-xs text-accent-mint font-medium">ESTÁVEL</span>
-                </div>
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map(i => (
-                    <div key={i} className={cn("flex-1 h-1 rounded-full", i <= 4 ? "bg-accent-mint" : "bg-white/10")} />
-                  ))}
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -651,6 +764,7 @@ export function Demands() {
               currentDate={currentDate} 
               demands={allDemands} 
               onUpdateStatus={handleUpdateStatus}
+              onDelete={handleDeleteDemand}
             />
           )}
           {viewMode === 'week' && (
@@ -658,6 +772,7 @@ export function Demands() {
               currentDate={currentDate} 
               demands={allDemands} 
               onUpdateStatus={handleUpdateStatus}
+              onDelete={handleDeleteDemand}
             />
           )}
           {viewMode === 'day' && (
@@ -665,131 +780,258 @@ export function Demands() {
               currentDate={currentDate} 
               demands={allDemands} 
               onUpdateStatus={handleUpdateStatus}
+              onDelete={handleDeleteDemand}
             />
           )}
         </div>
       </div>
 
-      {/* Demand List Section */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-medium">Lista Inteligente de Demandas</h3>
-          <div className="flex gap-2">
-            <select 
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs"
-            >
-              <option value="ALL">Todos Status</option>
-              <option value="PENDENTE">Pendente</option>
-              <option value="EM_ANDAMENTO">Em Andamento</option>
-              <option value="AGUARDANDO_APROVACAO">Aprovação</option>
-              <option value="CONCLUIDO">Concluído</option>
-              <option value="ATRASADO">Atrasado</option>
-            </select>
+      {/* Demand List & Creative Queue Split Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 text-left">
+        
+        {/* Left 2 Columns: Demand List Section */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-medium">Lista Inteligente de Demandas</h3>
+            <div className="flex gap-2">
+              <select 
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs"
+              >
+                <option value="ALL">Todos Status</option>
+                <option value="PENDENTE">Pendente</option>
+                <option value="EM_ANDAMENTO">Em Andamento</option>
+                <option value="AGUARDANDO_APROVACAO">Aprovação</option>
+                <option value="CONCLUIDO">Concluído</option>
+                <option value="ATRASADO">Atrasado</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="glass rounded-3xl overflow-hidden border border-white/5">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-white/5 text-[10px] font-bold uppercase tracking-widest text-text-muted">
+                    <th className="px-6 py-4">Tarefa</th>
+                    <th className="px-6 py-4">Cliente</th>
+                    <th className="px-6 py-4 text-center">Data</th>
+                    <th className="px-6 py-4 text-center">Status</th>
+                    <th className="px-6 py-4 text-center">Prioridade</th>
+                    <th className="px-6 py-4 text-center">Responsável</th>
+                    <th className="px-6 py-4 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredDemands.map((demand) => (
+                    <tr key={demand.id} className="group hover:bg-white/[0.02] transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-2 h-2 rounded-full",
+                            demand.status === 'ATRASADO' ? "bg-accent-coral animate-pulse" :
+                            demand.status === 'CONCLUIDO' ? "bg-accent-mint" : "bg-accent-amber"
+                          )} />
+                          <span className="font-medium text-sm">{demand.title}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold text-black" style={{ backgroundColor: demand.clientColor }}>
+                            {demand.clientName.charAt(0)}
+                          </div>
+                          <span className="text-xs text-text-secondary">{demand.clientName}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <p className="text-xs font-mono">{format(new Date(demand.date + "T12:00:00"), 'dd/MM/yyyy')}</p>
+                        {demand.status === 'ATRASADO' && (
+                          <p className="text-[10px] text-accent-coral font-bold mt-1">
+                            {differenceInDays(new Date(), new Date(demand.date + "T12:00:00"))} dias atrasado
+                          </p>
+                        )}
+                        {demand.status === 'PENDENTE' && (
+                          <div className="flex items-center justify-center gap-1 mt-1">
+                             <TrendingUp size={10} className="text-accent-amber" />
+                             <span className="text-[9px] text-text-muted font-bold uppercase">Risco de Atraso Médio</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={cn(
+                          "px-2 py-1 rounded text-[10px] font-bold uppercase",
+                          demand.status === 'CONCLUIDO' ? "bg-accent-mint/10 text-accent-mint" :
+                          demand.status === 'ATRASADO' ? "bg-accent-coral/10 text-accent-coral" :
+                          "bg-accent-amber/10 text-accent-amber"
+                        )}>
+                          {demand.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={cn(
+                          "text-[10px] font-bold uppercase",
+                          demand.priority === 'URGENTE' ? "text-accent-coral" :
+                          demand.priority === 'ALTA' ? "text-accent-amber" :
+                          "text-text-muted"
+                        )}>
+                          {demand.priority}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center text-xs text-text-secondary italic">
+                        Equipe Ômega
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                         <div className="flex items-center justify-end gap-2">
+                           {demand.status !== 'CONCLUIDO' && (
+                             <button 
+                              onClick={() => handleUpdateStatus(demand, 'CONCLUIDO')}
+                              className="p-2 hover:bg-accent-mint/10 text-text-muted hover:text-accent-mint rounded-lg transition-all"
+                              title="Concluir Demanda"
+                             >
+                                <CheckCircle size={14} />
+                             </button>
+                           )}
+                           <button 
+                            onClick={() => handleDeleteDemand(demand)}
+                            className="p-2 hover:bg-accent-coral/10 text-text-muted hover:text-accent-coral rounded-lg transition-all"
+                            title="Excluir Demanda"
+                           >
+                             <Trash2 size={14} />
+                           </button>
+                         </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredDemands.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center text-text-muted italic">
+                        Nenhuma demanda encontrada com os filtros atuais.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div className="glass rounded-3xl overflow-hidden border border-white/5">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-white/5 text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                  <th className="px-6 py-4">Tarefa</th>
-                  <th className="px-6 py-4">Cliente</th>
-                  <th className="px-6 py-4 text-center">Data</th>
-                  <th className="px-6 py-4 text-center">Status</th>
-                  <th className="px-6 py-4 text-center">Prioridade</th>
-                  <th className="px-6 py-4 text-center">Responsável</th>
-                  <th className="px-6 py-4 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {filteredDemands.map((demand) => (
-                  <tr key={demand.id} className="group hover:bg-white/[0.02] transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "w-2 h-2 rounded-full",
-                          demand.status === 'ATRASADO' ? "bg-accent-coral animate-pulse" :
-                          demand.status === 'CONCLUIDO' ? "bg-accent-mint" : "bg-accent-amber"
-                        )} />
-                        <span className="font-medium text-sm">{demand.title}</span>
+        {/* Right Column: Fila Estratégica de Criativos (Drag-and-Drop) */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-medium flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-accent-mint animate-pulse" />
+                Fila de Criativos
+              </h3>
+              <p className="text-xs text-text-muted mt-0.5">
+                Arraste os cards para priorizar a fila
+              </p>
+            </div>
+          </div>
+
+          <div className="glass rounded-3xl p-5 border border-white/5 space-y-4 max-h-[640px] overflow-y-auto custom-scrollbar bg-black/20">
+            {sortedCreatives.length === 0 ? (
+              <div className="py-12 text-center text-text-muted space-y-2">
+                <AlertCircle className="mx-auto opacity-35" size={28} />
+                <p className="text-xs">Nenhum criativo cadastrado para priorização.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sortedCreatives.map((creative, index) => {
+                  const clientOfCreative = clients.find(c => c.id === creative.clientId);
+                  const isItemDragged = draggedCreativeId === creative.id;
+                  
+                  return (
+                    <div
+                      key={creative.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, creative.id)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, index)}
+                      className={`p-4 rounded-2xl border transition-all flex items-start gap-3 select-none ${
+                        isItemDragged 
+                          ? 'bg-white/10 border-accent-mint/40 opacity-40 scale-[0.98]' 
+                          : 'bg-white/5 border-white/5 hover:border-white/10 hover:bg-white/[0.08] cursor-grab active:cursor-grabbing'
+                      }`}
+                    >
+                      {/* Drag Handle */}
+                      <div className="text-text-muted mt-1 shrink-0">
+                        <GripVertical size={14} className="opacity-40" />
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold text-black" style={{ backgroundColor: demand.clientColor }}>
-                          {demand.clientName.charAt(0)}
+
+                      {/* Card Content */}
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="flex items-center gap-2 justify-between mb-1.5">
+                          <span className="text-[10px] font-mono text-text-muted font-bold">
+                            {creative.code}
+                          </span>
+                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            {/* Urgent toggle */}
+                            <button
+                              onClick={() => handleToggleUrgent(creative)}
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider transition-all cursor-pointer ${
+                                creative.isUrgent
+                                  ? 'bg-accent-coral/20 text-accent-coral border border-accent-coral/30 shadow-[0_0_8px_rgba(255,90,95,0.15)]'
+                                  : 'bg-white/5 text-text-muted hover:text-white border border-transparent'
+                              }`}
+                              title={creative.isUrgent ? "Urgência Ativada" : "Definir como Urgente"}
+                            >
+                              URGENTE
+                            </button>
+
+                            {/* Status selector */}
+                            <select
+                              value={creative.status}
+                              onChange={(e) => handleUpdateCreativeStatus(creative, e.target.value as any)}
+                              className="bg-black/40 border border-white/10 text-[9px] text-text-secondary rounded px-1.5 py-0.5 font-bold outline-none cursor-pointer hover:border-white/25"
+                            >
+                              <option value="IDEIA">Ideia</option>
+                              <option value="PRODUZIDO">Prod</option>
+                              <option value="EDITADO">Edição</option>
+                              <option value="TESTE_CAMPANHA">Teste</option>
+                              <option value="VALIDADO">Valid</option>
+                              <option value="DESCARTADO">Desc</option>
+                            </select>
+                          </div>
                         </div>
-                        <span className="text-xs text-text-secondary">{demand.clientName}</span>
+
+                        {/* Title */}
+                        <h4 className="text-xs font-semibold text-white truncate">
+                          {creative.title}
+                        </h4>
+
+                        {/* Footer (Client Name & Details) */}
+                        <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-white/[0.04]">
+                          {clientOfCreative ? (
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span 
+                                className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse" 
+                                style={{ backgroundColor: clientOfCreative.brandColor || '#04DD72' }} 
+                              />
+                              <span className="text-[10px] text-text-secondary truncate font-medium">
+                                {clientOfCreative.name}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-[9px] text-text-muted font-mono">Sem Cliente</span>
+                          )}
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] text-text-muted bg-white/5 px-1.5 py-0.5 rounded font-mono">
+                              {creative.type}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <p className="text-xs font-mono">{format(new Date(demand.date + "T12:00:00"), 'dd/MM/yyyy')}</p>
-                      {demand.status === 'ATRASADO' && (
-                        <p className="text-[10px] text-accent-coral font-bold mt-1">
-                          {differenceInDays(new Date(), new Date(demand.date + "T12:00:00"))} dias atrasado
-                        </p>
-                      )}
-                      {demand.status === 'PENDENTE' && (
-                        <div className="flex items-center gap-1 mt-1">
-                           <TrendingUp size={10} className="text-accent-amber" />
-                           <span className="text-[9px] text-text-muted font-bold uppercase">Risco de Atraso Médio</span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={cn(
-                        "px-2 py-1 rounded text-[10px] font-bold uppercase",
-                        demand.status === 'CONCLUIDO' ? "bg-accent-mint/10 text-accent-mint" :
-                        demand.status === 'ATRASADO' ? "bg-accent-coral/10 text-accent-coral" :
-                        "bg-accent-amber/10 text-accent-amber"
-                      )}>
-                        {demand.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={cn(
-                        "text-[10px] font-bold uppercase",
-                        demand.priority === 'URGENTE' ? "text-accent-coral" :
-                        demand.priority === 'ALTA' ? "text-accent-amber" :
-                        "text-text-muted"
-                      )}>
-                        {demand.priority}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center text-xs text-text-secondary italic">
-                      Equipe Ômega
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                       <div className="flex items-center justify-end gap-2">
-                         {demand.status !== 'CONCLUIDO' && (
-                           <button 
-                            onClick={() => handleUpdateStatus(demand, 'CONCLUIDO')}
-                            className="p-2 hover:bg-accent-mint/10 text-text-muted hover:text-accent-mint rounded-lg transition-all"
-                           >
-                              <CheckCircle size={14} />
-                           </button>
-                         )}
-                         <button className="p-2 hover:bg-white/5 text-text-muted hover:text-white rounded-lg transition-all">
-                           <MoreVertical size={14} />
-                         </button>
-                       </div>
-                    </td>
-                  </tr>
-                ))}
-                {filteredDemands.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-text-muted italic">
-                      Nenhuma demanda encontrada com os filtros atuais.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
+
       </div>
 
       {/* Modals */}
@@ -817,7 +1059,7 @@ function SummaryCard({ label, value, icon: Icon, color }: { label: string, value
   );
 }
 
-function MonthCalendar({ currentDate, demands, onUpdateStatus }: { currentDate: Date, demands: DemandItem[], onUpdateStatus: any }) {
+function MonthCalendar({ currentDate, demands, onUpdateStatus, onDelete }: { currentDate: Date, demands: DemandItem[], onUpdateStatus: any, onDelete: any }) {
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const startDate = startOfWeek(monthStart, { locale: ptBR });
@@ -864,20 +1106,34 @@ function MonthCalendar({ currentDate, demands, onUpdateStatus }: { currentDate: 
             
             <div className="space-y-1 overflow-y-auto max-h-[100px] custom-scrollbar">
               {dayDemands.slice(0, 4).map(demand => (
-                <button 
+                <div 
                   key={demand.id}
-                  onClick={() => onUpdateStatus(demand, demand.status === 'CONCLUIDO' ? 'PENDENTE' : 'CONCLUIDO')}
                   className={cn(
-                    "w-full text-left px-1.5 py-1 rounded text-[9px] font-medium truncate flex items-center gap-1.5 group/item transition-all",
+                    "w-full text-left px-1.5 py-1 rounded text-[9px] font-medium flex items-center gap-1.5 group/item transition-all relative",
                     demand.status === 'CONCLUIDO' ? "bg-accent-mint/10 text-accent-mint/80 line-through" : "bg-white/5 text-white hover:bg-white/10",
                     demand.status === 'ATRASADO' && !demand.status.includes('CONCLUIDO') && "border-l-2 border-accent-coral"
                   )}
                   title={`${demand.clientName}: ${demand.title}`}
                 >
-                  <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: demand.clientColor }} />
-                  <span className="truncate flex-1">{demand.title}</span>
-                  {demand.status === 'CONCLUIDO' && <CheckCircle size={10} className="shrink-0" />}
-                </button>
+                  <button 
+                    onClick={() => onUpdateStatus(demand, demand.status === 'CONCLUIDO' ? 'PENDENTE' : 'CONCLUIDO')}
+                    className="flex-1 min-w-0 flex items-center gap-1.5 text-left"
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: demand.clientColor }} />
+                    <span className="truncate">{demand.title}</span>
+                    {demand.status === 'CONCLUIDO' && <CheckCircle size={10} className="shrink-0 text-accent-mint" />}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(demand);
+                    }}
+                    className="opacity-0 group-hover/item:opacity-100 p-0.5 hover:bg-white/20 rounded transition-all text-text-muted hover:text-accent-coral shrink-0 absolute right-1 bg-inherit"
+                    title="Excluir Demanda"
+                  >
+                    <Trash2 size={10} />
+                  </button>
+                </div>
               ))}
               {dayDemands.length > 4 && (
                 <p className="text-[9px] text-text-muted text-center font-bold px-1 py-0.5">
@@ -892,7 +1148,7 @@ function MonthCalendar({ currentDate, demands, onUpdateStatus }: { currentDate: 
   );
 }
 
-function WeekCalendar({ currentDate, demands, onUpdateStatus }: { currentDate: Date, demands: DemandItem[], onUpdateStatus: any }) {
+function WeekCalendar({ currentDate, demands, onUpdateStatus, onDelete }: { currentDate: Date, demands: DemandItem[], onUpdateStatus: any, onDelete: any }) {
   const startDate = startOfWeek(currentDate, { locale: ptBR });
   const days = eachDayOfInterval({ start: startDate, end: addDays(startDate, 6) });
   
@@ -928,7 +1184,7 @@ function WeekCalendar({ currentDate, demands, onUpdateStatus }: { currentDate: D
                 <div 
                   key={demand.id}
                   className={cn(
-                    "p-3 rounded-xl border transition-all cursor-pointer group hover:scale-[1.02]",
+                    "p-3 rounded-xl border transition-all cursor-pointer group hover:scale-[1.02] relative pr-6",
                     demand.status === 'CONCLUIDO' ? "bg-white/[0.02] border-white/5 opacity-50" : "bg-white/5 border-white/10 hover:border-white/20"
                   )}
                   onClick={() => onUpdateStatus(demand, demand.status === 'CONCLUIDO' ? 'PENDENTE' : 'CONCLUIDO')}
@@ -955,6 +1211,16 @@ function WeekCalendar({ currentDate, demands, onUpdateStatus }: { currentDate: D
                       demand.status === 'ATRASADO' && <AlertCircle size={12} className="text-accent-coral" />
                     )}
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(demand);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded-lg transition-all text-text-muted hover:text-accent-coral absolute top-2 right-2"
+                    title="Excluir Demanda"
+                  >
+                    <Trash2 size={12} />
+                  </button>
                 </div>
               ))}
               {dayDemands.length === 0 && (
@@ -970,7 +1236,7 @@ function WeekCalendar({ currentDate, demands, onUpdateStatus }: { currentDate: D
   );
 }
 
-function DayCalendar({ currentDate, demands, onUpdateStatus }: { currentDate: Date, demands: DemandItem[], onUpdateStatus: any }) {
+function DayCalendar({ currentDate, demands, onUpdateStatus, onDelete }: { currentDate: Date, demands: DemandItem[], onUpdateStatus: any, onDelete: any }) {
   const dateStr = format(currentDate, 'yyyy-MM-dd');
   const dayDemands = demands.filter(d => d.date === dateStr);
   
@@ -1041,8 +1307,16 @@ function DayCalendar({ currentDate, demands, onUpdateStatus }: { currentDate: Da
                     "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
                     demand.status === 'CONCLUIDO' ? "bg-accent-mint/20 text-accent-mint" : "bg-white/5 text-text-muted hover:bg-white/10 hover:text-white"
                   )}
+                  title="Alterar Status"
                 >
                   <CheckCircle size={20} />
+                </button>
+                <button 
+                  onClick={() => onDelete(demand)}
+                  className="w-10 h-10 rounded-xl bg-white/5 text-text-muted hover:bg-accent-coral/20 hover:text-accent-coral flex items-center justify-center transition-all"
+                  title="Excluir Demanda"
+                >
+                  <Trash2 size={18} />
                 </button>
               </div>
             </div>

@@ -116,5 +116,65 @@ export const storage = {
 
   deleteCreative: async (id: string) => {
     await firebaseStorage.deleteCreative(id);
+  },
+
+  listenToCreatives: (callback: (creatives: Creative[]) => void) => {
+    return firebaseStorage.listenToCreatives(callback);
+  },
+
+  // PROCESSES
+  getProcesses: async () => {
+    return await firebaseStorage.getProcesses();
+  },
+  saveProcess: async (process: any) => {
+    await firebaseStorage.saveProcess(process);
+  },
+  deleteProcess: async (id: string) => {
+    await firebaseStorage.deleteProcess(id);
+  },
+  listenToProcesses: (callback: (processes: any[]) => void) => {
+    return firebaseStorage.listenToProcesses(callback);
+  },
+
+  // COLUMNS
+  getColumns: async (processoId?: string) => {
+    return await firebaseStorage.getColumns(processoId);
+  },
+  saveColumn: async (col: any) => {
+    await firebaseStorage.saveColumn(col);
+  },
+  deleteColumn: async (id: string) => {
+    await firebaseStorage.deleteColumn(id);
+  },
+  listenToColumns: (processoId: string, callback: (cols: any[]) => void) => {
+    return firebaseStorage.listenToColumns(processoId, callback);
+  },
+
+  // TASKS
+  getTasks: async (processoId?: string) => {
+    return await firebaseStorage.getTasks(processoId);
+  },
+  saveTask: async (task: any) => {
+    await firebaseStorage.saveTask(task);
+  },
+  deleteTask: async (id: string) => {
+    await firebaseStorage.deleteTask(id);
+  },
+  listenToTasks: (processoId: string, callback: (tasks: any[]) => void) => {
+    return firebaseStorage.listenToTasks(processoId, callback);
+  },
+  listenToAllTasks: (callback: (tasks: any[]) => void) => {
+    return firebaseStorage.listenToAllTasks(callback);
+  },
+
+  // AUTOMATIONS
+  getAutomations: async (processoId: string) => {
+    return await firebaseStorage.getAutomations(processoId);
+  },
+  saveAutomation: async (auto: any) => {
+    await firebaseStorage.saveAutomation(auto);
+  },
+  deleteAutomation: async (id: string) => {
+    await firebaseStorage.deleteAutomation(id);
   }
 };
