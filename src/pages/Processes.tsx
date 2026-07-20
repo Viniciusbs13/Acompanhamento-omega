@@ -35,7 +35,7 @@ import { toast } from 'sonner';
 import { format, isPast, isToday, parseISO } from 'date-fns';
 
 export function Processes() {
-  const { user } = useAuth();
+  const { user, hasPermission, isProcessAllowed, isClientAllowed } = useAuth();
   
   // Real DB state
   const [processes, setProcesses] = useState<Processo[]>([]);
@@ -43,6 +43,14 @@ export function Processes() {
   const [tasks, setTasks] = useState<ProcessTask[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+
+  const allowedProcesses = useMemo(() => {
+    return processes.filter(p => isProcessAllowed(p.id));
+  }, [processes, isProcessAllowed]);
+
+  const allowedClients = useMemo(() => {
+    return clients.filter(c => isClientAllowed(c.id));
+  }, [clients, isClientAllowed]);
   
   // Selections
   const [activeProcessId, setActiveProcessId] = useState<string>('');
@@ -256,10 +264,6 @@ export function Processes() {
     // Listen to processes
     const unsubProcesses = storage.listenToProcesses((list) => {
       setProcesses(list);
-      if (list.length > 0 && !activeProcessId) {
-        // Find if there is an active process or set first
-        setActiveProcessId(list[0].id);
-      }
     });
 
     // Listen to all tasks
@@ -278,6 +282,17 @@ export function Processes() {
       unsubClients();
     };
   }, []);
+
+  // Sync activeProcessId reactively based on allowedProcesses
+  useEffect(() => {
+    if (allowedProcesses.length > 0) {
+      if (!activeProcessId || !allowedProcesses.some(p => p.id === activeProcessId)) {
+        setActiveProcessId(allowedProcesses[0].id);
+      }
+    } else {
+      setActiveProcessId('');
+    }
+  }, [allowedProcesses, activeProcessId]);
 
   // Sync columns when activeProcessId changes
   useEffect(() => {
@@ -306,6 +321,9 @@ export function Processes() {
     return tasks.filter(t => {
       // Must belong to this process board
       if (t.processoId !== activeProcessId) return false;
+
+      // Scope restriction check: Only show tasks for allowed clients
+      if (!isClientAllowed(t.clientId)) return false;
 
       // Search Query
       const matchesSearch = !searchQuery || 
@@ -903,44 +921,52 @@ export function Processes() {
             </button>
           )}
 
-          <button
-            onClick={() => setIsPermissionsModalOpen(true)}
-            className="px-4 py-2.5 bg-white/5 text-text-secondary border border-white/10 rounded-xl font-semibold text-xs hover:bg-white/10 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            <Lock size={14} />
-            Permissões
-          </button>
+          {hasPermission('usuarios', 'create') && (
+            <button
+              onClick={() => setIsPermissionsModalOpen(true)}
+              className="px-4 py-2.5 bg-white/5 text-text-secondary border border-white/10 rounded-xl font-semibold text-xs hover:bg-white/10 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Lock size={14} />
+              Permissões
+            </button>
+          )}
 
-          <button
-            onClick={() => setIsAutomationModalOpen(true)}
-            className="px-4 py-2.5 bg-white/5 text-text-secondary border border-white/10 rounded-xl font-semibold text-xs hover:bg-white/10 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            <Zap size={14} className="text-yellow-400" />
-            Automações
-          </button>
+          {hasPermission('processos', 'managePermissions') && (
+            <button
+              onClick={() => setIsAutomationModalOpen(true)}
+              className="px-4 py-2.5 bg-white/5 text-text-secondary border border-white/10 rounded-xl font-semibold text-xs hover:bg-white/10 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Zap size={14} className="text-yellow-400" />
+              Automações
+            </button>
+          )}
 
-          <button
-            onClick={() => setIsProcessModalOpen(true)}
-            className="px-4 py-2.5 bg-white/5 text-text-secondary border border-white/10 rounded-xl font-semibold text-xs hover:bg-white/10 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus size={14} />
-            Novo Processo
-          </button>
+          {hasPermission('processos', 'createProcess') && (
+            <button
+              onClick={() => setIsProcessModalOpen(true)}
+              className="px-4 py-2.5 bg-white/5 text-text-secondary border border-white/10 rounded-xl font-semibold text-xs hover:bg-white/10 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus size={14} />
+              Novo Processo
+            </button>
+          )}
 
-          <button
-            onClick={() => {
-              if (columns.length === 0) {
-                toast.error('Crie pelo menos uma coluna no Kanban antes de adicionar tarefas!');
-                return;
-              }
-              setSelectedColId(columns[0].id);
-              setIsTaskModalOpen(true);
-            }}
-            className="px-4 py-2.5 bg-accent-mint text-black font-bold rounded-xl text-xs hover:bg-accent-mint/95 transition-all shadow-lg shadow-accent-mint/10 flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus size={14} />
-            Nova Tarefa
-          </button>
+          {hasPermission('processos', 'createCards') && (
+            <button
+              onClick={() => {
+                if (columns.length === 0) {
+                  toast.error('Crie pelo menos uma coluna no Kanban antes de adicionar tarefas!');
+                  return;
+                }
+                setSelectedColId(columns[0].id);
+                setIsTaskModalOpen(true);
+              }}
+              className="px-4 py-2.5 bg-accent-mint text-black font-bold rounded-xl text-xs hover:bg-accent-mint/95 transition-all shadow-lg shadow-accent-mint/10 flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus size={14} />
+              Nova Tarefa
+            </button>
+          )}
         </div>
       </div>
 
@@ -949,7 +975,7 @@ export function Processes() {
         
         {/* Board Switcher tabs */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-white/[0.06] custom-scrollbar">
-          {processes.map(p => {
+          {allowedProcesses.map(p => {
             const isActive = p.id === activeProcessId;
             return (
               <div
@@ -1332,13 +1358,15 @@ export function Processes() {
                 </div>
 
                 <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => handleDeleteTask(activeTask.id)}
-                    className="p-2 text-text-muted hover:text-accent-coral hover:bg-white/5 rounded-xl transition-all cursor-pointer"
-                    title="Excluir Card"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {hasPermission('processos', 'deleteCards') && (
+                    <button
+                      onClick={() => handleDeleteTask(activeTask.id)}
+                      className="p-2 text-text-muted hover:text-accent-coral hover:bg-white/5 rounded-xl transition-all cursor-pointer"
+                      title="Excluir Card"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                   <button
                     onClick={() => setIsDetailOpen(false)}
                     className="p-2 text-text-muted hover:text-white hover:bg-white/5 rounded-xl transition-all cursor-pointer"

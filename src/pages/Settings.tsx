@@ -31,6 +31,17 @@ export function Settings() {
     toast.success('Configurações salvas!');
   };
 
+  const handleThemeChange = async (theme: 'light' | 'dark') => {
+    if (!settings) return;
+    const newSettings: UserSettings = {
+      ...settings,
+      theme
+    };
+    setSettings(newSettings);
+    await storage.saveSettings(newSettings);
+    toast.success(`Tema alterado para ${theme === 'dark' ? 'Escuro' : 'Claro'}!`);
+  };
+
   if (loading || !settings) return null;
 
   return (
@@ -53,7 +64,7 @@ export function Settings() {
           <div className="glass rounded-3xl p-8 border border-white/5 space-y-8">
              <div className="flex items-center gap-6">
                 <div className="w-20 h-20 rounded-full bg-accent-mint flex items-center justify-center text-black text-2xl font-bold overflow-hidden">
-                  {user?.photoURL ? <img src={user.photoURL} alt="User" /> : settings.managerName.charAt(0)}
+                  {user?.photoURL ? <img src={user.photoURL} alt="User" /> : (settings.managerName || '?').charAt(0)}
                 </div>
                 <div>
                    <h3 className="text-lg font-medium">{user?.displayName || settings.managerName}</h3>
@@ -108,11 +119,25 @@ export function Settings() {
           <div className="glass rounded-3xl p-8 border border-white/5">
              <h4 className="font-medium mb-4">Mudar Tema</h4>
              <div className="flex items-center gap-4">
-                <div className="flex-1 p-4 rounded-2xl bg-white/10 border-2 border-accent-mint cursor-pointer">
+                <div 
+                  onClick={() => handleThemeChange('dark')}
+                  className={`flex-1 p-4 rounded-2xl cursor-pointer border-2 transition-all ${
+                    settings.theme !== 'light'
+                      ? "border-accent-mint bg-white/10 opacity-100" 
+                      : "border-transparent bg-white/5 hover:border-white/10 opacity-60"
+                  }`}
+                >
                    <p className="text-sm font-medium text-center">Dark Mode (Padrão)</p>
                 </div>
-                <div className="flex-1 p-4 rounded-2xl bg-white/5 border-2 border-transparent hover:border-white/10 cursor-pointer opacity-50 grayscale transition-all">
-                   <p className="text-sm font-medium text-center">Light Mode (Beta)</p>
+                <div 
+                  onClick={() => handleThemeChange('light')}
+                  className={`flex-1 p-4 rounded-2xl cursor-pointer border-2 transition-all ${
+                    settings.theme === 'light'
+                      ? "border-accent-mint bg-white/10 opacity-100" 
+                      : "border-transparent bg-white/5 hover:border-white/10 opacity-60"
+                  }`}
+                >
+                   <p className="text-sm font-medium text-center">Light Mode</p>
                 </div>
              </div>
           </div>

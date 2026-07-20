@@ -12,7 +12,7 @@ import {
   collectionGroup
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import { Client, MetricEntry, UserSettings, Sale, CommercialGoal, MonthlyPayment, FinancialRelease, RecurringBill, FinancialGoal, Creative, Processo, ProcessColumn, ProcessTask, ProcessAutomation } from '../types';
+import { Client, MetricEntry, UserSettings, Sale, CommercialGoal, MonthlyPayment, FinancialRelease, RecurringBill, FinancialGoal, Creative, Processo, ProcessColumn, ProcessTask, ProcessAutomation, UserProfile, UserRole, ActivityLog } from '../types';
 
 enum OperationType {
   CREATE = 'create',
@@ -1248,6 +1248,134 @@ export const firebaseStorage = {
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
     }
+  },
+
+  // USERS MODULE
+  getAllUsers: async (): Promise<UserProfile[]> => {
+    const path = 'users';
+    try {
+      const q = query(collection(db, 'users'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  getUserProfile: async (userId: string): Promise<UserProfile | null> => {
+    const path = `users/${userId}`;
+    try {
+      const d = await getDoc(doc(db, 'users', userId));
+      if (d.exists()) {
+        return { ...d.data(), id: d.id } as UserProfile;
+      }
+      return null;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+      return null;
+    }
+  },
+
+  saveUserProfile: async (profile: UserProfile) => {
+    const path = `users/${profile.id}`;
+    try {
+      await setDoc(doc(db, 'users', profile.id), cleanData(profile), { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  deleteUserProfile: async (id: string) => {
+    const path = `users/${id}`;
+    try {
+      await deleteDoc(doc(db, 'users', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  listenToUsers: (callback: (users: UserProfile[]) => void) => {
+    const path = 'users';
+    return onSnapshot(collection(db, 'users'), (snapshot) => {
+      const list = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile));
+      callback(list);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    });
+  },
+
+  // ROLES
+  getRoles: async (): Promise<UserRole[]> => {
+    const path = 'roles';
+    try {
+      const snapshot = await getDocs(collection(db, 'roles'));
+      return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as UserRole));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  saveRole: async (role: UserRole) => {
+    const path = `roles/${role.id}`;
+    try {
+      await setDoc(doc(db, 'roles', role.id), cleanData(role), { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  deleteRole: async (id: string) => {
+    const path = `roles/${id}`;
+    try {
+      await deleteDoc(doc(db, 'roles', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  listenToRoles: (callback: (roles: UserRole[]) => void) => {
+    const path = 'roles';
+    return onSnapshot(collection(db, 'roles'), (snapshot) => {
+      const list = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as UserRole));
+      callback(list);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    });
+  },
+
+  // ACTIVITY LOGS
+  getActivityLogs: async (): Promise<ActivityLog[]> => {
+    const path = 'activity_logs';
+    try {
+      const q = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as ActivityLog));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
+  saveActivityLog: async (log: ActivityLog) => {
+    const path = `activity_logs/${log.id}`;
+    try {
+      await setDoc(doc(db, 'activity_logs', log.id), cleanData(log));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  listenToActivityLogs: (callback: (logs: ActivityLog[]) => void) => {
+    const path = 'activity_logs';
+    const q = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as ActivityLog));
+      callback(list);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    });
   }
 };
 

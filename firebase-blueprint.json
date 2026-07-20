@@ -8,9 +8,50 @@
         "managerName": { "type": "string" },
         "theme": { "type": "string", "enum": ["light", "dark"] },
         "trafficPanelUrl": { "type": "string" },
-        "executiveConfig": { "type": "object" }
+        "executiveConfig": { "type": "object" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "phone": { "type": "string" },
+        "roleId": { "type": "string" },
+        "roleName": { "type": "string" },
+        "team": { "type": "string" },
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+        "lastAccess": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "customPermissions": { "type": "object" },
+        "restrictedClients": { "type": "array", "items": { "type": "string" } },
+        "restrictedProcesses": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["managerName", "theme"]
+    },
+    "Role": {
+      "title": "User Role",
+      "description": "Role-based access control permission definition.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "permissions": { "type": "object" },
+        "createdAt": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["name", "permissions"]
+    },
+    "ActivityLog": {
+      "title": "Activity Log",
+      "description": "Audit trail logs for security and admin modifications.",
+      "type": "object",
+      "properties": {
+        "actorId": { "type": "string" },
+        "actorName": { "type": "string" },
+        "targetUserId": { "type": "string" },
+        "targetUserName": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["actorId", "actorName", "action", "timestamp"]
     },
     "Client": {
       "title": "Client",
@@ -294,6 +335,14 @@
     "/process_automations/{automationId}": {
       "schema": "ProcessAutomation",
       "description": "Collection of process automations."
+    },
+    "/roles/{roleId}": {
+      "schema": "Role",
+      "description": "Collection of RBAC roles and permissions."
+    },
+    "/activity_logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Collection of security and audit logs."
     }
   }
 }

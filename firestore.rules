@@ -27,10 +27,26 @@ service cloud.firestore {
       return resource.data;
     }
 
+    function isAdministrador() {
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roleName == 'Administrador';
+    }
+
     // User Profile
     match /users/{userId} {
-      allow get: if isSignedIn() && request.auth.uid == userId;
-      allow create, update: if isSignedIn() && request.auth.uid == userId;
+      function isValidUser(data) {
+        return data.managerName is string && data.managerName.size() <= 150 &&
+               data.theme in ['light', 'dark'] &&
+               (!('email' in data) || (data.email is string && data.email.size() <= 150)) &&
+               (!('roleName' in data) || (data.roleName is string && data.roleName.size() <= 100)) &&
+               (!('status' in data) || (data.status in ['ACTIVE', 'INACTIVE']));
+      }
+
+      allow list, get: if isSignedIn();
+      allow create: if isSignedIn() && (request.auth.uid == userId || isAdministrador()) && isValidUser(incoming());
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdministrador()) && isValidUser(incoming());
+      allow delete: if isSignedIn() && isAdministrador();
     }
 
     // Clients
@@ -294,6 +310,33 @@ service cloud.firestore {
       allow update: if isSignedIn() && isOwner(existing()) && isValidAutomation(incoming()) &&
                     incoming().ownerId == existing().ownerId;
       allow delete: if isSignedIn() && isOwner(existing());
+    }
+
+    // Roles
+    match /roles/{roleId} {
+      function isValidRole(data) {
+        return data.name is string && data.name.size() <= 100 &&
+               data.permissions is map;
+      }
+
+      allow list, get: if isSignedIn();
+      allow create: if isSignedIn() && isAdministrador() && isValidId(roleId) && isValidRole(incoming());
+      allow update: if isSignedIn() && isAdministrador() && isValidRole(incoming());
+      allow delete: if isSignedIn() && isAdministrador();
+    }
+
+    // Activity Logs
+    match /activity_logs/{logId} {
+      function isValidLog(data) {
+        return data.actorId is string && data.actorId.size() <= 128 &&
+               data.actorName is string && data.actorName.size() <= 150 &&
+               data.action is string && data.action.size() <= 200 &&
+               data.timestamp is string && data.timestamp.size() <= 100;
+      }
+
+      allow list, get: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(logId) && isValidLog(incoming());
+      allow update, delete: if isSignedIn() && isAdministrador();
     }
   }
 }

@@ -1,5 +1,5 @@
 import { firebaseStorage } from './firebaseStorage';
-import { Client, MetricEntry, UserSettings, Sale, CommercialGoal, MonthlyPayment, FinancialRelease, RecurringBill, FinancialGoal, Creative } from '../types';
+import { Client, MetricEntry, UserSettings, Sale, CommercialGoal, MonthlyPayment, FinancialRelease, RecurringBill, FinancialGoal, Creative, UserProfile, UserRole, ActivityLog } from '../types';
 
 export const storage = {
   // Payments
@@ -176,5 +176,47 @@ export const storage = {
   },
   deleteAutomation: async (id: string) => {
     await firebaseStorage.deleteAutomation(id);
+  },
+
+  // USERS MODULE
+  getAllUsers: async (): Promise<UserProfile[]> => {
+    return await firebaseStorage.getAllUsers();
+  },
+  getUserProfile: async (userId: string): Promise<UserProfile | null> => {
+    return await firebaseStorage.getUserProfile(userId);
+  },
+  saveUserProfile: async (profile: UserProfile) => {
+    await firebaseStorage.saveUserProfile(profile);
+  },
+  deleteUserProfile: async (id: string) => {
+    await firebaseStorage.deleteUserProfile(id);
+  },
+  listenToUsers: (callback: (users: UserProfile[]) => void) => {
+    return firebaseStorage.listenToUsers(callback);
+  },
+
+  // ROLES
+  getRoles: async (): Promise<UserRole[]> => {
+    return await firebaseStorage.getRoles();
+  },
+  saveRole: async (role: UserRole) => {
+    await firebaseStorage.saveRole(role);
+  },
+  deleteRole: async (id: string) => {
+    await firebaseStorage.deleteRole(id);
+  },
+  listenToRoles: (callback: (roles: UserRole[]) => void) => {
+    return firebaseStorage.listenToRoles(callback);
+  },
+
+  // ACTIVITY LOGS
+  getActivityLogs: async (): Promise<ActivityLog[]> => {
+    return await firebaseStorage.getActivityLogs();
+  },
+  saveActivityLog: async (log: ActivityLog) => {
+    await firebaseStorage.saveActivityLog(log);
+  },
+  listenToActivityLogs: (callback: (logs: ActivityLog[]) => void) => {
+    return firebaseStorage.listenToActivityLogs(callback);
   }
 };

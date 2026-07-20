@@ -385,3 +385,58 @@ export interface ProcessAutomation {
   isActive: boolean;
   ownerId?: string;
 }
+
+export interface ModulePermissions {
+  view: boolean;
+  create?: boolean;
+  edit?: boolean;
+  delete?: boolean;
+  complete?: boolean;
+  createProcess?: boolean;
+  editProcess?: boolean;
+  moveCards?: boolean;
+  createCards?: boolean;
+  deleteCards?: boolean;
+  createSale?: boolean;
+  editSale?: boolean;
+  deleteSale?: boolean;
+  editGoals?: boolean;
+  editPermissions?: boolean;
+}
+
+export interface UserRole {
+  id: string;
+  name: string;
+  permissions: Record<string, ModulePermissions>;
+  createdAt: string;
+  ownerId?: string;
+}
+
+export interface UserProfile extends UserSettings {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  photoUrl?: string;
+  phone?: string;
+  roleId?: string;
+  roleName?: string;
+  team?: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  lastAccess?: string;
+  createdAt: string;
+  customPermissions?: Record<string, ModulePermissions>;
+  restrictedClients?: string[];
+  restrictedProcesses?: string[];
+}
+
+export interface ActivityLog {
+  id: string;
+  actorId: string;
+  actorName: string;
+  targetUserId?: string;
+  targetUserName?: string;
+  action: string;
+  details: string;
+  timestamp: string;
+}

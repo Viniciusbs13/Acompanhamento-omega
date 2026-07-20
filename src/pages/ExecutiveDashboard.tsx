@@ -1200,7 +1200,7 @@ export function ExecutiveDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Commercial KPIs list */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           
           <div className="glass p-5 rounded-xl hover:border-white/10 transition-colors">
             <p className="text-text-secondary text-xs">Leads no Mês</p>
@@ -1238,7 +1238,7 @@ export function ExecutiveDashboard() {
             </div>
           </div>
 
-          <div className="glass p-5 rounded-xl col-span-2 flex items-center justify-between hover:border-white/10 transition-colors">
+          <div className="glass p-5 rounded-xl col-span-1 sm:col-span-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-white/10 transition-colors">
             <div>
               <p className="text-text-secondary text-xs">Investimento e Conversão Geral</p>
               <div className="flex gap-4 mt-1 items-baseline">
@@ -1351,7 +1351,7 @@ export function ExecutiveDashboard() {
               <span>Eficiência Operacional & Entregas</span>
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-3.5 bg-white/[0.02] border border-white/[0.05] rounded-xl">
                 <p className="text-text-secondary text-[11px] font-mono uppercase">Clientes Ativos</p>
                 <p className="text-2xl font-bold text-white mt-1">{clientesAtivosCount}</p>
@@ -1366,7 +1366,7 @@ export function ExecutiveDashboard() {
 
               <div className="p-3.5 bg-white/[0.02] border border-white/[0.05] rounded-xl">
                 <p className="text-text-secondary text-[11px] font-mono uppercase">Tempo Médio de Entrega</p>
-                <p className="text-xl font-bold text-white mt-1/2">{tempoMedioEntrega}</p>
+                <p className="text-xl font-bold text-white mt-1">{tempoMedioEntrega}</p>
                 <p className="text-[10px] text-text-muted mt-1">Tempo ótimo de aprovação</p>
               </div>
 
@@ -1398,7 +1398,7 @@ export function ExecutiveDashboard() {
               <span>Retenção & LTV (Life-Time Value)</span>
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="p-3.5 bg-white/[0.02] border border-white/[0.05] rounded-xl">
                 <p className="text-text-secondary text-[11px] font-mono uppercase">Tempo Médio de Permanência</p>
                 <p className="text-xl font-bold text-white mt-1">{tempoMedioPermanencia}</p>

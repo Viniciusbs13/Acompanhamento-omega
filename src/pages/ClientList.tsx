@@ -7,6 +7,7 @@ import { Client } from '../types';
 import { calculateMetrics, getHealthStatus } from '../lib/calculations';
 import { cn, formatCurrency } from '../lib/utils';
 import { useVisibility } from '../contexts/VisibilityContext';
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 
 const isContentDelayed = (client: any) => {
@@ -86,6 +87,7 @@ const isContentDelayed = (client: any) => {
 
 export function ClientList() {
   const { isVisible } = useVisibility();
+  const { hasPermission, isClientAllowed } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [allEntries, setAllEntries] = useState<Record<string, any[]>>({});
   const [search, setSearch] = useState('');
@@ -130,15 +132,19 @@ export function ClientList() {
     }
   };
 
+  const allowedClients = useMemo(() => {
+    return clients.filter(c => isClientAllowed(c.id));
+  }, [clients, isClientAllowed]);
+
   const categorizedClients = useMemo(() => {
-    const base = clients.filter(c => 
+    const base = allowedClients.filter(c => 
       c.name.toLowerCase().includes(search.toLowerCase())
     );
     return {
       monthly: base.filter(c => c.billingModel !== 'ONE_OFF'),
       single: base.filter(c => c.billingModel === 'ONE_OFF')
     };
-  }, [clients, search]);
+  }, [allowedClients, search]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -153,13 +159,15 @@ export function ClientList() {
              <button onClick={() => setViewMode('grid')} className={cn("p-2 rounded-lg transition-all", viewMode === 'grid' ? "bg-white/10 text-white" : "text-text-muted hover:text-white")}><LayoutGrid size={16} /></button>
              <button onClick={() => setViewMode('list')} className={cn("p-2 rounded-lg transition-all", viewMode === 'list' ? "bg-white/10 text-white" : "text-text-muted hover:text-white")}><List size={16} /></button>
           </div>
-          <Link 
-            to="/clientes/novo"
-            className="flex items-center gap-2 px-5 py-3 bg-accent-mint text-black font-bold rounded-xl hover:bg-accent-mint/90 transition-all shadow-lg shadow-accent-mint/10"
-          >
-            <Plus size={18} />
-            Cadastrar Cliente
-          </Link>
+          {hasPermission('clientes', 'create') && (
+            <Link 
+              to="/clientes/novo"
+              className="flex items-center gap-2 px-5 py-3 bg-accent-mint text-black font-bold rounded-xl hover:bg-accent-mint/90 transition-all shadow-lg shadow-accent-mint/10"
+            >
+              <Plus size={18} />
+              Cadastrar Cliente
+            </Link>
+          )}
         </div>
       </div>
 
@@ -264,6 +272,7 @@ export function ClientList() {
 
 function ClientGridItem({ client, entries, onDelete }: { client: Client; entries: any[]; onDelete: (id: string, e: React.MouseEvent) => void }) {
   const { isVisible } = useVisibility();
+  const { hasPermission } = useAuth();
   const last = entries[entries.length - 1];
   const metrics = last ? calculateMetrics(last, client.businessType) : null;
   const health = metrics ? getHealthStatus(metrics, 4) : 'GOOD';
@@ -357,19 +366,22 @@ function ClientGridItem({ client, entries, onDelete }: { client: Client; entries
         </div>
       </Link>
       
-      <button 
-        onClick={(e) => onDelete(client.id, e)}
-        className="absolute top-6 right-6 p-2 rounded-xl bg-bg-base/80 backdrop-blur-md border border-white/5 text-text-muted hover:bg-accent-coral/20 hover:text-accent-coral transition-all opacity-0 group-hover:opacity-100 z-10"
-        title="Excluir Cliente"
-      >
-        <Trash2 size={16} />
-      </button>
+      {hasPermission('clientes', 'delete') && (
+        <button 
+          onClick={(e) => onDelete(client.id, e)}
+          className="absolute top-6 right-6 p-2 rounded-xl bg-bg-base/80 backdrop-blur-md border border-white/5 text-text-muted hover:bg-accent-coral/20 hover:text-accent-coral transition-all opacity-0 group-hover:opacity-100 z-10"
+          title="Excluir Cliente"
+        >
+          <Trash2 size={16} />
+        </button>
+      )}
     </div>
   );
 }
 
 function ClientListItem({ client, entries, onDelete }: { client: Client; entries: any[]; onDelete: (id: string, e: React.MouseEvent) => void }) {
   const { isVisible } = useVisibility();
+  const { hasPermission } = useAuth();
   const last = entries[entries.length - 1];
   const metrics = last ? calculateMetrics(last, client.businessType) : null;
 
@@ -437,13 +449,15 @@ function ClientListItem({ client, entries, onDelete }: { client: Client; entries
         </div>
       </Link>
       
-      <button 
-        onClick={(e) => onDelete(client.id, e)}
-        className="absolute right-12 top-1/2 -translate-y-1/2 p-2.5 rounded-xl bg-white/5 border border-white/5 text-text-muted hover:bg-accent-coral/20 hover:text-accent-coral transition-all opacity-0 group-hover:opacity-100 z-10"
-        title="Excluir Cliente"
-      >
-        <Trash2 size={18} />
-      </button>
+      {hasPermission('clientes', 'delete') && (
+        <button 
+          onClick={(e) => onDelete(client.id, e)}
+          className="absolute right-12 top-1/2 -translate-y-1/2 p-2.5 rounded-xl bg-white/5 border border-white/5 text-text-muted hover:bg-accent-coral/20 hover:text-accent-coral transition-all opacity-0 group-hover:opacity-100 z-10"
+          title="Excluir Cliente"
+        >
+          <Trash2 size={18} />
+        </button>
+      )}
     </div>
   );
 }

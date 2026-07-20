@@ -17,7 +17,8 @@ import {
   Calendar,
   Globe,
   Target,
-  Layers
+  Layers,
+  Shield
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { cn } from '../lib/utils';
@@ -32,7 +33,7 @@ export function Layout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission, profile } = useAuth();
   const { isVisible, toggleVisibility } = useVisibility();
   const [settings, setSettings] = useState<any>(null);
 
@@ -55,16 +56,19 @@ export function Layout() {
   };
 
   const navItems = [
-    { label: 'Dashboard Executivo', icon: Target, path: '/dashboard-executivo' },
-    { label: 'Demandas', icon: Calendar, path: '/demandas' },
-    { label: 'Processos', icon: Layers, path: '/processos' },
-    { label: 'Clientes', icon: Users, path: '/clientes' },
-    { label: 'Comercial', icon: DollarSign, path: '/comercial' },
-    { label: 'Gestão de Carteira', icon: Briefcase, path: '/gestao' },
-    { label: 'Relatórios', icon: FileText, path: '/relatorios' },
-    { label: 'Tráfego', icon: Globe, path: '/trafego' },
-    { label: 'Configurações', icon: Settings, path: '/configuracoes' },
+    { label: 'Dashboard Executivo', icon: Target, path: '/dashboard-executivo', module: 'dashboard' },
+    { label: 'Demandas', icon: Calendar, path: '/demandas', module: 'demandas' },
+    { label: 'Processos', icon: Layers, path: '/processos', module: 'processos' },
+    { label: 'Clientes', icon: Users, path: '/clientes', module: 'clientes' },
+    { label: 'Comercial', icon: DollarSign, path: '/comercial', module: 'comercial' },
+    { label: 'Gestão de Carteira', icon: Briefcase, path: '/gestao', module: 'financeiro' },
+    { label: 'Relatórios', icon: FileText, path: '/relatorios', module: 'relatorios' },
+    { label: 'Tráfego', icon: Globe, path: '/trafego', module: 'trafego' },
+    { label: 'Configurações', icon: Settings, path: '/configuracoes', module: 'configuracoes' },
+    { label: 'Usuários', icon: Shield, path: '/usuarios', module: 'usuarios' },
   ];
+
+  const allowedNavItems = navItems.filter(item => hasPermission(item.module, 'view'));
 
   return (
     <div className="flex min-h-screen bg-bg-base text-text-primary overflow-x-hidden">
@@ -79,7 +83,7 @@ export function Layout() {
         </div>
 
         <nav className="flex-1 px-4 space-y-1">
-          {navItems.map((item) => {
+          {allowedNavItems.map((item) => {
             const isActive = location.pathname === item.path || (item.path === '/clientes' && location.pathname.startsWith('/clientes'));
             return (
               <Link
@@ -146,13 +150,15 @@ export function Layout() {
               <Search size={16} />
               <span className="text-xs opacity-50 font-mono">⌘K</span>
             </button>
-            <Link 
-              to="/clientes/novo"
-              className="px-4 py-2 bg-accent-mint text-black font-semibold rounded-lg text-sm flex items-center gap-2 hover:bg-accent-mint/90 transition-all shadow-lg shadow-accent-mint/10"
-            >
-              <Plus size={16} />
-              <span className="hidden sm:inline">Novo Cliente</span>
-            </Link>
+            {hasPermission('clientes', 'create') && (
+              <Link 
+                to="/clientes/novo"
+                className="px-4 py-2 bg-accent-mint text-black font-semibold rounded-lg text-sm flex items-center gap-2 hover:bg-accent-mint/90 transition-all shadow-lg shadow-accent-mint/10"
+              >
+                <Plus size={16} />
+                <span className="hidden sm:inline">Novo Cliente</span>
+              </Link>
+            )}
             <button 
               onClick={toggleVisibility}
               className="p-2 text-text-secondary hover:text-white transition-colors"
