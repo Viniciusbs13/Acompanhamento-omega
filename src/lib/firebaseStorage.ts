@@ -618,13 +618,19 @@ export const firebaseStorage = {
     if (!auth.currentUser) return [];
     const path = SALES_COL;
     try {
-      let q = query(collection(db, path), where('ownerId', '==', auth.currentUser.uid), orderBy('date', 'desc'));
+      let q = query(collection(db, path), where('ownerId', '==', auth.currentUser.uid));
       if (monthYear) {
         // Simple string prefix query for "YYYY-MM" if we format dates correctly
         // Or we can filter in JS for simplicity since sales volume per month is usually manageable
       }
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Sale));
+      const salesList = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Sale));
+      // Sort by date desc in memory to avoid composite index errors
+      return salesList.sort((a, b) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        return dateB.localeCompare(dateA);
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -756,11 +762,16 @@ export const firebaseStorage = {
     try {
       const q = query(
         collection(db, path), 
-        where('ownerId', '==', auth.currentUser.uid),
-        orderBy('date', 'asc')
+        where('ownerId', '==', auth.currentUser.uid)
       );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => ({ ...d.data(), id: d.id } as MetricEntry));
+      const entriesList = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as MetricEntry));
+      // Sort by date asc in memory to avoid composite index errors
+      return entriesList.sort((a, b) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        return dateA.localeCompare(dateB);
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
