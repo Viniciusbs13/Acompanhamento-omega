@@ -65,9 +65,22 @@ export function Commercial() {
     }
   };
 
+  // Safe date formatting helper
+  const formatDate = (dateStr: string | undefined | null) => {
+    if (!dateStr || typeof dateStr !== 'string') return '-';
+    try {
+      const cleanDate = dateStr.split('T')[0];
+      const d = new Date(cleanDate + 'T12:00:00');
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString('pt-BR');
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
   // Filtered data for selected month
   const monthlySales = useMemo(() => {
-    return sales.filter(s => s.date.startsWith(monthKey));
+    return sales.filter(s => s && s.date && typeof s.date === 'string' && s.date.startsWith(monthKey));
   }, [sales, monthKey]);
 
   const monthlyGoal = useMemo(() => {
@@ -75,17 +88,17 @@ export function Commercial() {
   }, [goals, monthKey, selectedMonth]);
 
   // Metrics
-  const totalRevenue = useMemo(() => monthlySales.reduce((acc, s) => acc + s.value, 0), [monthlySales]);
+  const totalRevenue = useMemo(() => monthlySales.reduce((acc, s) => acc + (s.value || 0), 0), [monthlySales]);
   const recurringRevenue = useMemo(() => 
     monthlySales
-      .filter(s => s.billingModel === 'RECURRING' || (!s.billingModel && clients.find(c => c.id === s.clientId)?.billingModel !== 'ONE_OFF'))
-      .reduce((acc, s) => acc + s.value, 0), 
+      .filter(s => s && (s.billingModel === 'RECURRING' || (!s.billingModel && clients.find(c => c && c.id === s.clientId)?.billingModel !== 'ONE_OFF')))
+      .reduce((acc, s) => acc + (s.value || 0), 0), 
   [monthlySales, clients]);
   
   const oneOffRevenue = useMemo(() => 
     monthlySales
-      .filter(s => s.billingModel === 'ONE_OFF' || (!s.billingModel && clients.find(c => c.id === s.clientId)?.billingModel === 'ONE_OFF'))
-      .reduce((acc, s) => acc + s.value, 0), 
+      .filter(s => s && (s.billingModel === 'ONE_OFF' || (!s.billingModel && clients.find(c => c && c.id === s.clientId)?.billingModel === 'ONE_OFF')))
+      .reduce((acc, s) => acc + (s.value || 0), 0), 
   [monthlySales, clients]);
 
   const salesCount = monthlySales.length;
@@ -94,11 +107,20 @@ export function Commercial() {
   const isGoalReached = progress >= 100;
 
   // Previous Month Stats
-  const prevMonthDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1, 1);
-  const prevMonthKey = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
-  const prevMonthSales = sales.filter(s => s.date.startsWith(prevMonthKey));
-  const prevTotalRevenue = prevMonthSales.reduce((acc, s) => acc + s.value, 0);
-  const growth = prevTotalRevenue > 0 ? ((totalRevenue / prevTotalRevenue) - 1) * 100 : 0;
+  const prevMonthDate = useMemo(() => new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1, 1), [selectedMonth]);
+  const prevMonthKey = useMemo(() => `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`, [prevMonthDate]);
+  
+  const prevMonthSales = useMemo(() => {
+    return sales.filter(s => s && s.date && typeof s.date === 'string' && s.date.startsWith(prevMonthKey));
+  }, [sales, prevMonthKey]);
+
+  const prevTotalRevenue = useMemo(() => {
+    return prevMonthSales.reduce((acc, s) => acc + (s.value || 0), 0);
+  }, [prevMonthSales]);
+
+  const growth = useMemo(() => {
+    return prevTotalRevenue > 0 ? ((totalRevenue / prevTotalRevenue) - 1) * 100 : 0;
+  }, [totalRevenue, prevTotalRevenue]);
 
   // Chart Data
   const chartData = useMemo(() => {
@@ -109,8 +131,8 @@ export function Commercial() {
     for (let i = 1; i <= daysInMonth; i++) {
       const dayStr = `${monthKey}-${String(i).padStart(2, '0')}`;
       const dayRevenue = monthlySales
-        .filter(s => s.date.startsWith(dayStr))
-        .reduce((acc, s) => acc + s.value, 0);
+        .filter(s => s && s.date && typeof s.date === 'string' && s.date.startsWith(dayStr))
+        .reduce((acc, s) => acc + (s.value || 0), 0);
       
       cumulative += dayRevenue;
       data.push({
@@ -453,7 +475,7 @@ export function Commercial() {
                     R$ {sale.value.toLocaleString()}
                   </td>
                   <td className="px-8 py-6 text-xs text-text-muted">
-                    {new Date(sale.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                    {formatDate(sale.date)}
                   </td>
                   <td className="px-8 py-6">
                     <div className={cn(
